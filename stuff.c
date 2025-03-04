@@ -128,38 +128,93 @@ struct table
     int size;
 };
 
-struct dlinkedlist
+struct stack
 {
-    struct dlinkedlist *prev;
-    struct table tb;
-    struct dlinkedlist *next;
+    struct table **tb;
+    int top;
 };
 
-void createTbEntry(struct table *tb, char *id, int val)
+struct table * createEntry(struct table *tb, char *str, int val)
 {
-    tb->entry = realloc(tb->entry, (tb->size+1) * sizeof(struct entry));
-    tb->entry[tb->size].id = calloc(1, 1);
-    strcat(tb->entry[tb->size].id, id); /* ERROR!!! BOUND OVERFLOW HERE */
-    tb->entry[tb->size].val = val;
+    int i;
+    for(i = 0; i<tb->size; i++)
+    {
+        if(strcmp(tb->entry[i].id, str) == 0)
+        {
+            printf("ERROR: redeclaration of %s\n", tb->entry[i].id);
+            exit(-1);
+        }
+    }
+
     tb->size++;
+    tb->entry = realloc(tb->entry, tb->size * sizeof(struct entry));
+    tb->entry[tb->size-1].id = str;
+    tb->entry[tb->size-1].val = val;
+
+    return tb;
 }
 
-struct dlinkedlist * createTb(void)
+/* push a pointer to a table to the stack */
+struct stack pushTablePtr(struct stack st)
 {
-    struct dlinkedlist *tblist = malloc(sizeof(struct dlinkedlist));
-    tblist->tb.size = 0;
+    st.top++;
+    st.tb = realloc(st.tb, (st.top+1) * sizeof(struct table *));
+    st.tb[st.top] = malloc(sizeof(struct table));
+
+    st.tb[st.top]->entry = NULL;
+    st.tb[st.top]->size = 0;
+
+    return st;
+}
+
+/* pop a pointer to a table from the stack */
+struct stack popTablePtr(struct stack st)
+{
+    if(st.top == 0)
+    {
+        st.top--;
+        st.tb = NULL;
+        return st;
+    } else if(st.top == -1)
+    {
+        printf("ERROR: cannot pop; nothing on the stack\n");
+        exit(-1);
+    }
+
+    st.top--;
+    st.tb = realloc(st.tb, (st.top+1) * sizeof(struct table *));
+
+    return st;
+}
+
+struct entry * search(struct stack st, char *test)
+{
+    int i;
+    for(i = st.top; i>=0; i--)
+    {
+        int j;
+        for(j = st.tb[i]->size-1; j>=0; j--)
+        {
+            if(strcmp(st.tb[i]->entry[j].id, test) == 0)
+            {
+                return &(st.tb[i]->entry[j]);
+            }
+        }
+    }
     
-    return tblist;
+    printf("ERROR: \"%s\" has not been defined\n", test);
+    exit(-1);
 }
 
 /*
     block -> statement newlines block | e
     statement -> op | if | while
-    oper -> add | sub | mult | set
+    oper -> add | sub | mult | set | let
     add -> "add" (id | num) "to" id
     sub -> "subtract" (id | num) "from" id
     mult -> "multiply" id "by" (id | num)
     set -> "set" id "equal" "to" (id | num)
+    let -> "let" id "equal" (id | num)
     ifst -> "if" id cond (id | num) "then" newlines block "end"
     whilest -> "while" id cond (id | num) "do" newlines block "end" "while"
     cond -> "islessthan" | "isgreaterthan" | "isequalto"
@@ -172,42 +227,45 @@ void add();
 void sub();
 void mult();
 void set();
+void let();
 void ifst();
 void whilest();
 void cond();
 void newlines();
 
 /* block -> statement newlines block | e */
-void block(char **str, struct token *tk)
+void block(char **str, struct token *tk, struct stack *st)
 {
     if(strcmp(tk->val, "add") == 0      ||
        strcmp(tk->val, "subtract") == 0 ||
        strcmp(tk->val, "multiply") == 0 ||
        strcmp(tk->val, "set") == 0      ||
+       strcmp(tk->val, "let") == 0      ||
        strcmp(tk->val, "if") == 0       ||
        strcmp(tk->val, "while") == 0)
     {
-        statement(str, tk);
-        newlines(str, tk);
-        block(str, tk);
+        statement(str, tk, st);
+        newlines(str, tk, st);
+        block(str, tk, st);
     }
 }
 
 /* statement -> op | if | while */
-void statement(char **str, struct token *tk)
+void statement(char **str, struct token *tk, struct stack *st)
 {
     if(strcmp(tk->val, "add") == 0  ||
        strcmp(tk->val, "subtract") == 0  ||
        strcmp(tk->val, "multiply") == 0 ||
-       strcmp(tk->val, "set") == 0)
+       strcmp(tk->val, "set") == 0 ||
+       strcmp(tk->val, "let") == 0)
     {
-        oper(str, tk);
+        oper(str, tk, st);
     } else if(strcmp(tk->val, "if") == 0)
     {
-        ifst(str, tk); /* if statement */
+        ifst(str, tk, st); /* if statement */
     } else if(strcmp(tk->val, "while") == 0)
     {
-        whilest(str, tk); /* while statement */
+        whilest(str, tk, st); /* while statement */
     } else
     {
         printf("ERROR: \"%s\" is not a valid beginning of a statement\n", tk->val);
@@ -216,20 +274,23 @@ void statement(char **str, struct token *tk)
 }
 
 /* oper -> add | sub | mult | set */
-void oper(char **str, struct token *tk)
+void oper(char **str, struct token *tk, struct stack *st)
 {
     if(strcmp(tk->val, "add") == 0)
     {
-        add(str, tk);
+        add(str, tk, st);
     } else if(strcmp(tk->val, "subtract") == 0)
     {
-        sub(str, tk);
+        sub(str, tk, st);
     } else if(strcmp(tk->val, "multiply") == 0)
     {
-        mult(str, tk);
+        mult(str, tk, st);
     } else if(strcmp(tk->val, "set") == 0)
     {
-        set(str, tk);
+        set(str, tk, st);
+    } else if(strcmp(tk->val, "let") == 0)
+    {
+        let(str, tk, st);
     } else
     {
         printf("ERROR: malformed operation\n");
@@ -238,11 +299,15 @@ void oper(char **str, struct token *tk)
 }
 
 /* add -> "add" (id | num) "to" id */
-void add(char **str, struct token *tk)
+void add(char **str, struct token *tk, struct stack *st)
 {
     expectVal(str, tk, "add");
     
-    if(tk->name == id || tk->name == num)
+    if(tk->name == id)
+    {   
+        struct entry *tempEntry = search(*st, tk->val);
+        expectName(str, tk, tk->name);
+    } else if(tk->name == num)
     {
         expectName(str, tk, tk->name);
     } else
@@ -252,15 +317,20 @@ void add(char **str, struct token *tk)
     }
     
     expectVal(str, tk, "to");
+    struct entry *tempEntry = search(*st, tk->val);
     expectName(str, tk, id);
 }
 
 /* sub -> "subtract" (id | num) "from" id */
-void sub(char **str, struct token *tk)
+void sub(char **str, struct token *tk, struct stack *st)
 {;
     expectVal(str, tk, "subtract");
     
-    if(tk->name == id || tk->name == num)
+    if(tk->name == id)
+    {   
+        struct entry *tempEntry = search(*st, tk->val);
+        expectName(str, tk, tk->name);
+    } else if(tk->name == num)
     {
         expectName(str, tk, tk->name);
     } else
@@ -270,19 +340,25 @@ void sub(char **str, struct token *tk)
     }
     
     expectVal(str, tk, "from");
+    struct entry *tempEntry = search(*st, tk->val);
     expectName(str, tk, id);
 }
 
 /* mult -> "multiply" id "by" (id | num) */
-void mult(char **str, struct token *tk)
+void mult(char **str, struct token *tk, struct stack *st)
 {
     expectVal(str, tk, "multiply");
     
+    struct entry *tempEntry = search(*st, tk->val);
     expectName(str, tk, id);
     
     expectVal(str, tk, "by");
     
-    if(tk->name == id || tk->name == num)
+    if(tk->name == id)
+    {   
+        struct entry *tempEntry = search(*st, tk->val);
+        expectName(str, tk, tk->name);
+    } else if(tk->name == num)
     {
         expectName(str, tk, tk->name);
     } else
@@ -293,17 +369,48 @@ void mult(char **str, struct token *tk)
 }
 
 /* set -> "set" id "equal" "to" (id | num) */
-void set(char **str, struct token *tk)
+void set(char **str, struct token *tk, struct stack *st)
 {
     expectVal(str, tk, "set");
 	
+    struct entry *tempEntry = search(*st, tk->val);
 	expectName(str, tk, id);
 	
 	expectVal(str, tk, "equal");
 	expectVal(str, tk, "to");
     
-    if(tk->name == id || tk->name == num)
+    if(tk->name == id)
+    {   
+        struct entry *tempEntry = search(*st, tk->val);
+        expectName(str, tk, tk->name);
+    } else if(tk->name == num)
     {
+        expectName(str, tk, tk->name);
+    } else
+    {
+        printf("ERROR: expected id or num\n");
+        exit(-1);
+    }
+}
+
+/* let -> "let" id "equal" (id | num) */
+void let(char **str, struct token *tk, struct stack *st)
+{
+    expectVal(str, tk, "let");
+	
+	char *temp = tk->val;
+	expectName(str, tk, id);
+	
+	expectVal(str, tk, "equal");
+    
+    if(tk->name == id)
+    {
+        struct entry *tempEntry = search(*st, tk->val);
+        st->tb[st->top] = createEntry(st->tb[st->top], temp, tempEntry->val);
+        expectName(str, tk, tk->name);
+    } else if(tk->name == num)
+    {
+        st->tb[st->top] = createEntry(st->tb[st->top], temp, atoi(tk->val)); /* !!! ADD: definitely check size before hand so there is no overflow !!! */
         expectName(str, tk, tk->name);
     } else
     {
@@ -313,13 +420,20 @@ void set(char **str, struct token *tk)
 }
 
 /* ifst -> "if" id cond (id | num) "then" newlines block "end" */
-void ifst(char **str, struct token *tk)
+void ifst(char **str, struct token *tk, struct stack *st)
 {
     expectVal(str, tk, "if");
-    expectName(str, tk, id);
-    cond(str, tk);
     
-    if(tk->name == id || tk->name == num)
+    struct entry *tempEntry = search(*st, tk->val);
+    expectName(str, tk, id);
+    
+    cond(str, tk, st);
+    
+    if(tk->name == id)
+    {   
+        struct entry *tempEntry = search(*st, tk->val);
+        expectName(str, tk, tk->name);
+    } else if(tk->name == num)
     {
         expectName(str, tk, tk->name);
     } else
@@ -329,19 +443,31 @@ void ifst(char **str, struct token *tk)
     }
     
     expectVal(str, tk, "then");
-    newlines(str, tk);
-    block(str, tk);
+    
+    *st = pushTablePtr(*st);
+    
+    newlines(str, tk, st);
+    block(str, tk, st);
     expectVal(str, tk, "end");
+    
+    *st = popTablePtr(*st);
 }
 
 /* whilest -> "while" id cond (id | num) "do" newlines block "end" "while" */
-void whilest(char **str, struct token *tk)
+void whilest(char **str, struct token *tk, struct stack *st)
 {
     expectVal(str, tk, "while");
-    expectName(str, tk, id);
-    cond(str, tk);
     
-    if(tk->name == id || tk->name == num)
+    struct entry *tempEntry = search(*st, tk->val);
+    expectName(str, tk, id);
+    
+    cond(str, tk, st);
+    
+    if(tk->name == id)
+    {   
+        struct entry *tempEntry = search(*st, tk->val);
+        expectName(str, tk, tk->name);
+    } else if(tk->name == num)
     {
         expectName(str, tk, tk->name);
     } else
@@ -351,14 +477,19 @@ void whilest(char **str, struct token *tk)
     }
     
     expectVal(str, tk, "do");
-    newlines(str, tk);
-    block(str, tk);
+    
+    *st = pushTablePtr(*st);
+    
+    newlines(str, tk, st);
+    block(str, tk, st);
     expectVal(str, tk, "end");
     expectVal(str, tk, "while");
+    
+    *st = popTablePtr(*st);
 }
 
 /* cond -> "islessthan" | "isgreaterthan" | "isequalto" */
-void cond(char **str, struct token *tk)
+void cond(char **str, struct token *tk, struct stack *st)
 {
     if(strcmp(tk->val, "islessthan") == 0 ||
        strcmp(tk->val, "isgreaterthan") == 0 ||
@@ -373,30 +504,41 @@ void cond(char **str, struct token *tk)
 }
 
 /* newlines -> "\n" newlines | e */
-void newlines(char **str, struct token *tk)
+void newlines(char **str, struct token *tk, struct stack *st)
 {
     if(tk->name == newline)
     {
         expectName(str, tk, newline);
-        newlines(str, tk);
+        newlines(str, tk, st);
     } else
     {
         
     }
 }
 
-void parse(char **str, struct token *tk)
+void parse(char **str, struct token *tk, struct stack *st)
 {
-    newlines(str, tk);
-    block(str, tk);
+    *st = pushTablePtr(*st);
+    
+    newlines(str, tk, st);
+    block(str, tk, st);
     expectName(str, tk, EOI);
 }
 
 int main(void)
 {
-    char *str = "if x islessthan 5 then\n\n\n add 3 to x\n\n\n subtract 1 from x\n\n\n end";
+    char *str = "let a equal 3\n \
+                 let b equal 2\n \
+                 if b islessthan 10 then\n \
+                    set a equal to 4\n \
+                 end\n";
     struct token tk = getNextToken(&str);
-    parse(&str, &tk);
+    
+    struct stack st;
+    st.tb = NULL;
+    st.top = -1;
+    
+    parse(&str, &tk, &st);
 	
     return 0;
 }
