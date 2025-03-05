@@ -168,8 +168,12 @@ struct stack pushTablePtr(struct stack st)
 }
 
 /* pop a pointer to a table from the stack */
-struct stack popTablePtr(struct stack st)
+struct stack popTablePtr(struct stack st, struct table ***saveTb, int *saveTableSize)
 {
+    *saveTb = realloc(*saveTb, (*saveTableSize)+1 * sizeof(struct table *));
+    (*saveTb)[*saveTableSize] = st.tb[st.top];
+    (*saveTableSize)++;
+    
     if(st.top == 0)
     {
         st.top--;
@@ -234,7 +238,7 @@ void cond();
 void newlines();
 
 /* block -> statement newlines block | e */
-void block(char **str, struct token *tk, struct stack *st)
+void block(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize)
 {
     if(strcmp(tk->val, "add") == 0      ||
        strcmp(tk->val, "subtract") == 0 ||
@@ -244,14 +248,14 @@ void block(char **str, struct token *tk, struct stack *st)
        strcmp(tk->val, "if") == 0       ||
        strcmp(tk->val, "while") == 0)
     {
-        statement(str, tk, st);
-        newlines(str, tk, st);
-        block(str, tk, st);
+        statement(str, tk, st, saveTb, saveTableSize);
+        newlines(str, tk, st, saveTb, saveTableSize);
+        block(str, tk, st, saveTb, saveTableSize);
     }
 }
 
 /* statement -> op | if | while */
-void statement(char **str, struct token *tk, struct stack *st)
+void statement(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize)
 {
     if(strcmp(tk->val, "add") == 0  ||
        strcmp(tk->val, "subtract") == 0  ||
@@ -259,13 +263,13 @@ void statement(char **str, struct token *tk, struct stack *st)
        strcmp(tk->val, "set") == 0 ||
        strcmp(tk->val, "let") == 0)
     {
-        oper(str, tk, st);
+        oper(str, tk, st, saveTb, saveTableSize);
     } else if(strcmp(tk->val, "if") == 0)
     {
-        ifst(str, tk, st); /* if statement */
+        ifst(str, tk, st, saveTb, saveTableSize); /* if statement */
     } else if(strcmp(tk->val, "while") == 0)
     {
-        whilest(str, tk, st); /* while statement */
+        whilest(str, tk, st, saveTb, saveTableSize); /* while statement */
     } else
     {
         printf("ERROR: \"%s\" is not a valid beginning of a statement\n", tk->val);
@@ -274,23 +278,23 @@ void statement(char **str, struct token *tk, struct stack *st)
 }
 
 /* oper -> add | sub | mult | set */
-void oper(char **str, struct token *tk, struct stack *st)
+void oper(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize)
 {
     if(strcmp(tk->val, "add") == 0)
     {
-        add(str, tk, st);
+        add(str, tk, st, saveTb, saveTableSize);
     } else if(strcmp(tk->val, "subtract") == 0)
     {
-        sub(str, tk, st);
+        sub(str, tk, st, saveTb, saveTableSize);
     } else if(strcmp(tk->val, "multiply") == 0)
     {
-        mult(str, tk, st);
+        mult(str, tk, st, saveTb, saveTableSize);
     } else if(strcmp(tk->val, "set") == 0)
     {
-        set(str, tk, st);
+        set(str, tk, st, saveTb, saveTableSize);
     } else if(strcmp(tk->val, "let") == 0)
     {
-        let(str, tk, st);
+        let(str, tk, st, saveTb, saveTableSize);
     } else
     {
         printf("ERROR: malformed operation\n");
@@ -299,7 +303,7 @@ void oper(char **str, struct token *tk, struct stack *st)
 }
 
 /* add -> "add" (id | num) "to" id */
-void add(char **str, struct token *tk, struct stack *st)
+void add(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize)
 {
     expectVal(str, tk, "add");
     
@@ -322,7 +326,7 @@ void add(char **str, struct token *tk, struct stack *st)
 }
 
 /* sub -> "subtract" (id | num) "from" id */
-void sub(char **str, struct token *tk, struct stack *st)
+void sub(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize)
 {;
     expectVal(str, tk, "subtract");
     
@@ -345,7 +349,7 @@ void sub(char **str, struct token *tk, struct stack *st)
 }
 
 /* mult -> "multiply" id "by" (id | num) */
-void mult(char **str, struct token *tk, struct stack *st)
+void mult(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize)
 {
     expectVal(str, tk, "multiply");
     
@@ -369,7 +373,7 @@ void mult(char **str, struct token *tk, struct stack *st)
 }
 
 /* set -> "set" id "equal" "to" (id | num) */
-void set(char **str, struct token *tk, struct stack *st)
+void set(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize)
 {
     expectVal(str, tk, "set");
 	
@@ -394,7 +398,7 @@ void set(char **str, struct token *tk, struct stack *st)
 }
 
 /* let -> "let" id "equal" (id | num) */
-void let(char **str, struct token *tk, struct stack *st)
+void let(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize)
 {
     expectVal(str, tk, "let");
 	
@@ -420,14 +424,14 @@ void let(char **str, struct token *tk, struct stack *st)
 }
 
 /* ifst -> "if" id cond (id | num) "then" newlines block "end" */
-void ifst(char **str, struct token *tk, struct stack *st)
+void ifst(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize)
 {
     expectVal(str, tk, "if");
     
     struct entry *tempEntry = search(*st, tk->val);
     expectName(str, tk, id);
     
-    cond(str, tk, st);
+    cond(str, tk, st, saveTb, saveTableSize);
     
     if(tk->name == id)
     {   
@@ -446,22 +450,22 @@ void ifst(char **str, struct token *tk, struct stack *st)
     
     *st = pushTablePtr(*st);
     
-    newlines(str, tk, st);
-    block(str, tk, st);
+    newlines(str, tk, st, saveTb, saveTableSize);
+    block(str, tk, st, saveTb, saveTableSize);
     expectVal(str, tk, "end");
     
-    *st = popTablePtr(*st);
+    *st = popTablePtr(*st, saveTb, saveTableSize);
 }
 
 /* whilest -> "while" id cond (id | num) "do" newlines block "end" "while" */
-void whilest(char **str, struct token *tk, struct stack *st)
+void whilest(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize)
 {
     expectVal(str, tk, "while");
     
     struct entry *tempEntry = search(*st, tk->val);
     expectName(str, tk, id);
     
-    cond(str, tk, st);
+    cond(str, tk, st, saveTb, saveTableSize);
     
     if(tk->name == id)
     {   
@@ -480,16 +484,16 @@ void whilest(char **str, struct token *tk, struct stack *st)
     
     *st = pushTablePtr(*st);
     
-    newlines(str, tk, st);
-    block(str, tk, st);
+    newlines(str, tk, st, saveTb, saveTableSize);
+    block(str, tk, st, saveTb, saveTableSize);
     expectVal(str, tk, "end");
     expectVal(str, tk, "while");
     
-    *st = popTablePtr(*st);
+    *st = popTablePtr(*st, saveTb, saveTableSize);
 }
 
 /* cond -> "islessthan" | "isgreaterthan" | "isequalto" */
-void cond(char **str, struct token *tk, struct stack *st)
+void cond(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize)
 {
     if(strcmp(tk->val, "islessthan") == 0 ||
        strcmp(tk->val, "isgreaterthan") == 0 ||
@@ -504,41 +508,48 @@ void cond(char **str, struct token *tk, struct stack *st)
 }
 
 /* newlines -> "\n" newlines | e */
-void newlines(char **str, struct token *tk, struct stack *st)
+void newlines(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize)
 {
     if(tk->name == newline)
     {
         expectName(str, tk, newline);
-        newlines(str, tk, st);
+        newlines(str, tk, st, saveTb, saveTableSize);
     } else
     {
         
     }
 }
 
-void parse(char **str, struct token *tk, struct stack *st)
+void parse(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize)
 {
     *st = pushTablePtr(*st);
     
-    newlines(str, tk, st);
-    block(str, tk, st);
+    newlines(str, tk, st, saveTb, saveTableSize);
+    block(str, tk, st, saveTb, saveTableSize);
     expectName(str, tk, EOI);
+    
+    *st = popTablePtr(*st, saveTb, saveTableSize);
 }
 
 int main(void)
 {
-    char *str = "let a equal 3\n \
-                 let b equal 2\n \
-                 if b islessthan 10 then\n \
-                    set a equal to 4\n \
-                 end\n";
-    struct token tk = getNextToken(&str);
+    char *str = "let a equal 3";
+    struct token tk = getNextToken(&str); /* get first token */
     
+    /* symbol table stack init */
     struct stack st;
     st.tb = NULL;
     st.top = -1;
     
-    parse(&str, &tk, &st);
-	
+    /* table of saved pointers for deallocation after
+       values are popped off the stack */
+    struct table **saveTb = NULL;
+    int saveTableSize = 0;
+    
+    parse(&str, &tk, &st, &saveTb, &saveTableSize);
+    
+    int i;
+    for(i = 0; i<saveTableSize; i++) free(saveTb[i]);
+    
     return 0;
 }
