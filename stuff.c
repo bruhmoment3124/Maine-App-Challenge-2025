@@ -286,9 +286,9 @@ void block(char **str, struct token *tk, struct stack *st, struct table ***saveT
     if(strcmp(tk->val, "add") == 0      ||
        strcmp(tk->val, "subtract") == 0 ||
        strcmp(tk->val, "multiply") == 0 ||
-       strcmp(tk->val, "set") == 0      ||
        strcmp(tk->val, "move") == 0     ||
        strcmp(tk->val, "turn") == 0     ||
+	   strcmp(tk->val, "set") == 0      ||
        strcmp(tk->val, "let") == 0      ||
        strcmp(tk->val, "if") == 0       ||
        strcmp(tk->val, "while") == 0)
@@ -445,14 +445,14 @@ void move(char **str, struct token *tk, struct stack *st, struct table ***saveTb
     expectVal(str, tk, "move");
     expectVal(str, tk, "turtle");
     
-    int dir;
+    int *dir = malloc(sizeof(int));
     if(strcmp(tk->val, "forward") == 0)
     {
-        dir = 1;
+        *dir = 1;
         expectVal(str, tk, tk->val);
     } else if(strcmp(tk->val, "backward") == 0)
     {
-        dir = -1;
+        *dir = -1;
         expectVal(str, tk, tk->val);
     } else
     {
@@ -463,13 +463,13 @@ void move(char **str, struct token *tk, struct stack *st, struct table ***saveTb
     if(tk->name == id)
     {
         struct entry *arg = search(*st, tk->val);
-        *instList = emitInst(*instList, instListSize, op_move, &(arg->val), &dir, NULL);
+        *instList = emitInst(*instList, instListSize, op_move, &(arg->val), dir, NULL);
         expectName(str, tk, tk->name);
     } else if(tk->name == num)
     {
         int *c = malloc(sizeof(int)); /* constant value temporary */
         *c = atoi(tk->val);
-        *instList = emitInst(*instList, instListSize, op_move, c, &dir, NULL);
+        *instList = emitInst(*instList, instListSize, op_move, c, dir, NULL);
         expectName(str, tk, tk->name);
     } else
     {
@@ -578,19 +578,20 @@ void ifst(char **str, struct token *tk, struct stack *st, struct table ***saveTb
     expectName(str, tk, id);
     
     enum instType cnd = cond(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    int tempLabel = *label;
+    int *tempLabel = malloc(sizeof(int));
+	*tempLabel = *label;
     (*label)++;
     
     if(tk->name == id)
     {   
         struct entry *secondArg = search(*st, tk->val);
         expectName(str, tk, tk->name);
-        *instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), &(secondArg->val), &tempLabel);
+        *instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), &(secondArg->val), tempLabel);
     } else if(tk->name == num)
     {
         int *c = malloc(sizeof(int)); /* constant value temporary */
         *c = atoi(tk->val);
-        *instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), c, &tempLabel);
+        *instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), c, tempLabel);
         expectName(str, tk, tk->name);
     } else
     {
@@ -606,7 +607,7 @@ void ifst(char **str, struct token *tk, struct stack *st, struct table ***saveTb
     block(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
     expectVal(str, tk, "end");
     
-    *instList= emitInst(*instList, instListSize, t_label, &tempLabel, NULL, NULL);
+    *instList= emitInst(*instList, instListSize, t_label, tempLabel, NULL, NULL);
     
     *st = popTablePtr(*st, saveTb, saveTableSize);
 }
@@ -621,23 +622,26 @@ void whilest(char **str, struct token *tk, struct stack *st, struct table ***sav
     
     enum instType cnd = cond(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
     
-	int firstTempLabel = *label;
-    (*label)++;
-    int secondTempLabel = *label;
+	int *firstTempLabel = malloc(sizeof(int));
+	*firstTempLabel = *label;
+	(*label)++;
+	
+    int *secondTempLabel = malloc(sizeof(int));
+	*firstTempLabel = *label;
     (*label)++;
     
     if(tk->name == id)
     {   
         struct entry *secondArg = search(*st, tk->val);
         expectName(str, tk, tk->name);
-        *instList = emitInst(*instList, instListSize, t_label, &firstTempLabel, NULL, NULL);
-        *instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), &(secondArg->val), &secondTempLabel);
+        *instList = emitInst(*instList, instListSize, t_label, firstTempLabel, NULL, NULL);
+        *instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), &(secondArg->val), secondTempLabel);
     } else if(tk->name == num)
     {
         int *c = malloc(sizeof(int)); /* constant value temporary */
         *c = atoi(tk->val);
-		*instList = emitInst(*instList, instListSize, t_label, &firstTempLabel, NULL, NULL);
-        *instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), c, &secondTempLabel);
+		*instList = emitInst(*instList, instListSize, t_label, firstTempLabel, NULL, NULL);
+        *instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), c, secondTempLabel);
         expectName(str, tk, tk->name);
     } else
     {
@@ -654,8 +658,8 @@ void whilest(char **str, struct token *tk, struct stack *st, struct table ***sav
     expectVal(str, tk, "end");
     expectVal(str, tk, "while");
     
-    *instList = emitInst(*instList, instListSize, op_jmp, &firstTempLabel, NULL, NULL);
-    *instList = emitInst(*instList, instListSize, t_label, &secondTempLabel, NULL, NULL);
+    *instList = emitInst(*instList, instListSize, op_jmp, firstTempLabel, NULL, NULL);
+    *instList = emitInst(*instList, instListSize, t_label, secondTempLabel, NULL, NULL);
     
     *st = popTablePtr(*st, saveTb, saveTableSize);
 }
@@ -800,10 +804,12 @@ void interpret(struct inst *instList, int instListSize)
 int main(void)
 {
     char *str = "let a equal 3 \
-				 while a islessthan 5 do \
-					move turtle forward a px \
-					add 1 to a \
-				 end while \
+				 if a islessthan 4 then \
+					if a islessthan 2 then \
+						add 1 to a \
+						move turtle forward a px \
+					end \
+				 end \
 				 move turtle forward a px";
 				
     struct token tk = getNextToken(&str); /* get first token */
@@ -825,6 +831,7 @@ int main(void)
     
     parse(&str, &tk, &st, &saveTb, &saveTableSize, &instList, &instListSize, &label);
 	
+	
 	/*int i;
 	for(i = 0; i<instListSize; i++)
 	{
@@ -835,11 +842,8 @@ int main(void)
 		printf("\n");
 	}*/
 	
-    interpret(instList, instListSize);
 	
-    int j;
-    for(j = 0; j<saveTableSize; j++) free(saveTb[j]);
-    free(saveTb);
+    interpret(instList, instListSize);
 	
 	getchar();
 	
