@@ -260,7 +260,7 @@ struct inst * emitInst(struct inst *instList, int *size, enum instType type, int
     turn -> "turn" "turtle" ("left" | "right") (id | num) "degrees"
     set -> "set" id "equal" "to" (id | num)
     let -> "let" id "equal" (id | num)
-    ifst -> "if" id cond (id | num) "then" newlines block "end"
+    ifst -> "if" id cond (id | num) "then" newlines block "end" "if"
     whilest -> "while" id cond (id | num) "do" newlines block "end" "while"
     cond -> "islessthan" | "isgreaterthan" | "isequalto"
     newlines -> "\n" newlines | e
@@ -569,7 +569,7 @@ void let(char **str, struct token *tk, struct stack *st, struct table ***saveTb,
     }
 }
 
-/* ifst -> "if" id cond (id | num) "then" newlines block "end" */
+/* ifst -> "if" id cond (id | num) "then" newlines block "end" "if" */
 void ifst(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
 {
     expectVal(str, tk, "if");
@@ -606,6 +606,7 @@ void ifst(char **str, struct token *tk, struct stack *st, struct table ***saveTb
     newlines(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
     block(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
     expectVal(str, tk, "end");
+	expectVal(str, tk, "if");
     
     *instList= emitInst(*instList, instListSize, t_label, tempLabel, NULL, NULL);
     
@@ -803,14 +804,13 @@ void interpret(struct inst *instList, int instListSize)
 
 int main(void)
 {
-    char *str = "let a equal 3 \
-				 if a islessthan 4 then \
-					if a islessthan 2 then \
-						add 1 to a \
-						move turtle forward a px \
-					end \
-				 end \
-				 move turtle forward a px";
+    char *str = "let i equal 0 \
+				 while i islessthan 5 do \
+					move turtle forward i px \
+					add 1 to i \
+					let i equal 10 \
+					move turtle forward i px \
+				 end while";
 				
     struct token tk = getNextToken(&str); /* get first token */
     
