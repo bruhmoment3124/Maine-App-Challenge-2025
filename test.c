@@ -60,12 +60,6 @@ struct list * insertNext(struct list *list, enum stmts stmt, Font fnt)
 		case iftail: tempStr = "end if"; break;
 	}
 	
-	if(tempDraw.stmts == whiletail ||
-	   tempDraw.stmts == iftail) tempDraw.xoffset = list->draw.xoffset - 20;
-	
-	tempDraw.rec.x = tempDraw.xoffset;
-	tempDraw.rec.y = tempDraw.yoffset;
-	
 	Vector2 size = MeasureTextEx(fnt, tempStr, 16, 1);
 	tempDraw.rec.width = size.x+5;
 	tempDraw.rec.height = size.y+5;
@@ -73,17 +67,8 @@ struct list * insertNext(struct list *list, enum stmts stmt, Font fnt)
 	tempDraw.clr = BLUE;
 	tempDraw.strClr = WHITE;
 	
-	tempDraw.collisionRec.x = tempDraw.rec.x;
-	tempDraw.collisionRec.y = tempDraw.rec.y+10;
 	tempDraw.collisionRec.width = tempDraw.rec.width;
-	tempDraw.collisionRec.height = tempDraw.rec.height;
-	
-	if(tempDraw.stmts == whilehead ||
-	   tempDraw.stmts == ifhead) tempDraw.xoffset = list->draw.xoffset + 20;
-		
-	tempDraw.yoffset = list->draw.yoffset + 20;
-	
-	printf("%d\n", tempDraw.yoffset);
+	tempDraw.collisionRec.height = tempDraw.rec.height-2;
 	
 	tempDraw.str = tempStr;
 	
@@ -104,6 +89,31 @@ struct list * insertNext(struct list *list, enum stmts stmt, Font fnt)
     return list;
 }
 
+struct list * setOffset(struct list *list)
+{
+	int xoffset = 0, yoffset = 0;
+	
+	struct list *tmp;
+	for(tmp = list->next; tmp != NULL; tmp = tmp->next)
+	{
+		if(tmp->draw.stmts == whiletail ||
+		   tmp->draw.stmts == iftail) xoffset -= 20;
+	
+		tmp->draw.rec.x = xoffset;
+		tmp->draw.rec.y = yoffset;
+		
+		tmp->draw.collisionRec.x = tmp->draw.rec.x;
+		tmp->draw.collisionRec.y = tmp->draw.rec.y+10;
+		
+		if(tmp->draw.stmts == whilehead ||
+		   tmp->draw.stmts == ifhead) xoffset += 20;
+		
+		yoffset += 20;
+	}
+	
+	return list;
+}
+
 struct list * deleteNext(struct list *list)
 {
     struct list *tmpNode = list->next;
@@ -122,20 +132,6 @@ void drawVals(struct list *list, Font fnt)
 		DrawRectangleRec(tmp->draw.rec, tmp->draw.clr);
 		DrawTextEx(fnt, tmp->draw.str, strPos, 16, 1, tmp->draw.strClr);
 	}
-}
-
-struct list * clickInst(struct list *list)
-{
-	/* input code */
-	Vector2 msPos = GetMousePosition();
-	
-	struct list *tmp;
-	for(tmp = list->next; tmp != NULL; tmp = tmp->next)
-	{
-		if(CheckCollisionPointRec(msPos, tmp->draw.rec) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) return tmp;
-	}
-	
-	return NULL;
 }
 
 struct btns
@@ -192,6 +188,10 @@ int main(void)
 	list->next = NULL;
 	list->draw.xoffset = 0;
 	list->draw.yoffset = 0;
+	list->draw.collisionRec.x = 0;
+	list->draw.collisionRec.y = 0;
+	list->draw.collisionRec.width = 100;
+	list->draw.collisionRec.height = 20;
 	
 	struct btns *buttons = malloc(9 * sizeof(struct btns));
 	
@@ -202,13 +202,15 @@ int main(void)
 	Font unifont = LoadFont("unifont.otf");
 	buttons = createButtons(buttons, unifont);
 	
-	list = insertNext(list, whilehead, unifont);
-	
-	struct list *tmp = list->next;
+	enum stmts stmt;
+	int whilecond = 0, ifcond = 0;
+	int enable = 0;
 	
 	while(!WindowShouldClose())
 	{
 		BeginDrawing();
+		
+		DrawRectangleRec(list->draw.collisionRec, GREEN);
 		
 		drawVals(list, unifont);
 		drawButtons(buttons, unifont);
@@ -220,9 +222,6 @@ int main(void)
 		{
 			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, buttons[i].box))
 			{
-				enum stmts stmt;
-				int whilecond = 0, ifcond = 0;
-				
 				switch(buttons[i].type)
 				{
 					case 0: stmt = add; break;
@@ -235,25 +234,46 @@ int main(void)
 					case 7: whilecond = 1; break;
 					case 8: ifcond = 1; break;
 				}
-				
+				enable = 1;
+			}
+		}
+		
+		if(enable == 1)
+		{
+			/* draw green line below instructions */
+			struct list *tmp;
+			for(tmp = list->next; tmp != NULL; tmp = tmp->next)
+			{
+				if(CheckCollisionPointRec(msPos, tmp->draw.collisionRec))
+				{
+					DrawRectangle(tmp->draw.rec.x, tmp->draw.rec.y+18, tmp->draw.rec.width, 2, GREEN);
+				}
+			}
+		
+			Rectangle tempRec = {msPos.x, msPos.y, 50, 50};
+			DrawRectangleRec(tempRec, RED);
+		}
+		
+		struct list *tmp;
+		for(tmp = list; tmp != NULL; tmp = tmp->next)
+		{
+			if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmp->draw.collisionRec) && enable == 1)
+			{
 				if(whilecond == 1)
 				{
-					tmp = insertNext(tmp, whilehead, unifont);
-					tmp = tmp->next;
 					tmp = insertNext(tmp, whiletail, unifont);
+					tmp = insertNext(tmp, whilehead, unifont);
+					whilecond = 0;
 				} else if(ifcond == 1)
 				{
 					tmp = insertNext(tmp, ifhead, unifont);
-					tmp = tmp->next;
-					tmp = insertNext(tmp, iftail, unifont);
+					ifcond = 0;
 				} else
 				{
 					tmp = insertNext(tmp, stmt, unifont);
 				}
-				tmp = tmp->next;
-			} else if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
-			{
-				
+				list = setOffset(list);
+				enable = 0;
 			}
 		}
 		
