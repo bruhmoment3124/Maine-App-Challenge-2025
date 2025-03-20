@@ -191,7 +191,7 @@ int main(void)
 	list->draw.collisionRec.x = 0;
 	list->draw.collisionRec.y = 0;
 	list->draw.collisionRec.width = 100;
-	list->draw.collisionRec.height = 20;
+	list->draw.collisionRec.height = 10;
 	
 	struct btns *buttons = malloc(9 * sizeof(struct btns));
 	
@@ -206,11 +206,13 @@ int main(void)
 	int whilecond = 0, ifcond = 0;
 	int enable = 0;
 	
+	int saveInst;
+	
 	while(!WindowShouldClose())
 	{
 		BeginDrawing();
 		
-		DrawRectangleRec(list->draw.collisionRec, GREEN);
+		//DrawRectangleRec(list->draw.collisionRec, GREEN);
 		
 		drawVals(list, unifont);
 		drawButtons(buttons, unifont);
@@ -231,15 +233,17 @@ int main(void)
 					case 4: stmt = turn; break;
 					case 5: stmt = set; break;
 					case 6: stmt = let; break;
-					case 7: whilecond = 1; break;
-					case 8: ifcond = 1; break;
+					case 7: stmt = whilehead; whilecond = 1; break;
+					case 8: stmt = ifhead; ifcond = 1; break;
 				}
+				
+				saveInst = i;
 				enable = 1;
 			}
 		}
 		
 		if(enable == 1)
-		{
+		{	
 			/* draw green line below instructions */
 			struct list *tmp;
 			for(tmp = list->next; tmp != NULL; tmp = tmp->next)
@@ -249,9 +253,30 @@ int main(void)
 					DrawRectangle(tmp->draw.rec.x, tmp->draw.rec.y+18, tmp->draw.rec.width, 2, GREEN);
 				}
 			}
+			
+			/* draw red line when above start */
+			if(CheckCollisionPointRec(msPos, list->draw.collisionRec))
+			{
+				if(list->next != NULL)
+				{
+					DrawRectangle(list->draw.collisionRec.x, list->draw.collisionRec.y, list->next->draw.collisionRec.width, 2, RED);
+				} else
+				{
+					DrawRectangle(list->draw.collisionRec.x, list->draw.collisionRec.y, list->draw.collisionRec.width, 2, RED);
+				}
+			}
 		
-			Rectangle tempRec = {msPos.x, msPos.y, 50, 50};
+			Vector2 tmpSize = MeasureTextEx(unifont, buttons[saveInst].str, 16, 1);
+			int width = tmpSize.x+5;
+			int height = tmpSize.y+5;
+			
+			/* rectangle position and drawing */
+			Rectangle tempRec = {msPos.x - (int)(width/2), msPos.y - (int)(height/2), width, height};
 			DrawRectangleRec(tempRec, RED);
+			
+			/* text position and drawing */
+			Vector2 strPos = {tempRec.x+2, tempRec.y+2};
+			DrawTextEx(unifont, buttons[saveInst].str, strPos, 16, 1, WHITE);
 		}
 		
 		struct list *tmp;
@@ -266,6 +291,7 @@ int main(void)
 					whilecond = 0;
 				} else if(ifcond == 1)
 				{
+					tmp = insertNext(tmp, iftail, unifont);
 					tmp = insertNext(tmp, ifhead, unifont);
 					ifcond = 0;
 				} else
