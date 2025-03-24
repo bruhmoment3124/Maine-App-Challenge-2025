@@ -39,9 +39,6 @@ struct list
 struct list * insertNext(struct list *list, enum stmts stmt, Font fnt)
 {
 	struct draw tempDraw;
-	
-	tempDraw.xoffset = list->draw.xoffset;
-	tempDraw.yoffset = list->draw.yoffset;
 	tempDraw.stmts = stmt;
 	
 	char *tempStr;
@@ -180,6 +177,36 @@ void drawButtons(struct btns *buttons, Font fnt)
 	}
 }
 
+int hover(Vector2 msPos, struct list *list)
+{
+	/* draw green line below instructions */
+	struct list *tmp;
+	for(tmp = list->next; tmp != NULL; tmp = tmp->next)
+	{
+		if(CheckCollisionPointRec(msPos, tmp->draw.collisionRec))
+		{
+			DrawRectangle(tmp->draw.rec.x, tmp->draw.rec.y+18, tmp->draw.rec.width, 2, GREEN);
+			return 1;
+		}
+	}
+	
+	/* draw red line when above start */
+	if(CheckCollisionPointRec(msPos, list->draw.collisionRec))
+	{
+		if(list->next != NULL)
+		{
+			DrawRectangle(list->draw.collisionRec.x, list->draw.collisionRec.y, list->next->draw.collisionRec.width, 2, RED);
+		} else
+		{
+			DrawRectangle(list->draw.collisionRec.x, list->draw.collisionRec.y, list->draw.collisionRec.width, 2, RED);
+		}
+		
+		return 1;
+	}
+	
+	return 0;
+}
+
 int main(void)
 {
 	struct list *list = malloc(sizeof(struct list));
@@ -204,9 +231,13 @@ int main(void)
 	
 	enum stmts stmt;
 	int whilecond = 0, ifcond = 0;
-	int enable = 0;
 	
-	int saveInst;
+	int btnEnable = 0, movEnable = 0;
+	
+	int saveInst; /* save button instruction for displaying later */
+
+	struct list *save = NULL;
+	int blockLength = 0;
 	
 	while(!WindowShouldClose())
 	{
@@ -219,6 +250,7 @@ int main(void)
 		
 		Vector2 msPos = GetMousePosition();
 		
+		/* check if a button is pressed */
 		int i;
 		for(i = 0; i<9; i++)
 		{
@@ -233,38 +265,20 @@ int main(void)
 					case 4: stmt = turn; break;
 					case 5: stmt = set; break;
 					case 6: stmt = let; break;
-					case 7: stmt = whilehead; whilecond = 1; break;
-					case 8: stmt = ifhead; ifcond = 1; break;
+					case 7: whilecond = 1; break;
+					case 8: ifcond = 1; break;
 				}
 				
 				saveInst = i;
-				enable = 1;
+				btnEnable = 1;
 			}
 		}
 		
-		if(enable == 1)
-		{	
-			/* draw green line below instructions */
-			struct list *tmp;
-			for(tmp = list->next; tmp != NULL; tmp = tmp->next)
-			{
-				if(CheckCollisionPointRec(msPos, tmp->draw.collisionRec))
-				{
-					DrawRectangle(tmp->draw.rec.x, tmp->draw.rec.y+18, tmp->draw.rec.width, 2, GREEN);
-				}
-			}
-			
-			/* draw red line when above start */
-			if(CheckCollisionPointRec(msPos, list->draw.collisionRec))
-			{
-				if(list->next != NULL)
-				{
-					DrawRectangle(list->draw.collisionRec.x, list->draw.collisionRec.y, list->next->draw.collisionRec.width, 2, RED);
-				} else
-				{
-					DrawRectangle(list->draw.collisionRec.x, list->draw.collisionRec.y, list->draw.collisionRec.width, 2, RED);
-				}
-			}
+		
+		/* if a button has been pressed, enable it */
+		if(btnEnable == 1)
+		{
+			hover(msPos, list);
 		
 			Vector2 tmpSize = MeasureTextEx(unifont, buttons[saveInst].str, 16, 1);
 			int width = tmpSize.x+5;
@@ -279,10 +293,13 @@ int main(void)
 			DrawTextEx(unifont, buttons[saveInst].str, strPos, 16, 1, WHITE);
 		}
 		
+		
+		/* check if the mouse button has been released after it has been
+		   pressed, and if it was over a collision area */
 		struct list *tmp;
 		for(tmp = list; tmp != NULL; tmp = tmp->next)
 		{
-			if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmp->draw.collisionRec) && enable == 1)
+			if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmp->draw.collisionRec) && btnEnable == 1)
 			{
 				if(whilecond == 1)
 				{
@@ -299,9 +316,111 @@ int main(void)
 					tmp = insertNext(tmp, stmt, unifont);
 				}
 				list = setOffset(list);
-				enable = 0;
+				btnEnable = 0;
 			}
 		}
+		
+		/* if one of the instructions is dragged */
+		for(tmp = list; tmp != NULL; tmp = tmp->next)
+		{
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmp->draw.rec) && tmp->draw.stmts != whiletail && tmp->draw.stmts != iftail && movEnable == 0)
+			{
+				if(tmp->draw.stmts == whilehead || tmp->draw.stmts == ifhead)
+				{
+					save = tmp;
+					int tempLength = 1;
+					
+					struct list *l;
+					int n = 1;
+					for(l = tmp->next; n > 0; l = l->next)
+					{
+						if(l->draw.stmts == whilehead || l->draw.stmts == ifhead) n++;
+						if(l->draw.stmts == whiletail || l->draw.stmts == iftail) n--;
+						
+						tempLength++;
+					}
+					
+					blockLength = tempLength;
+				}
+				
+				if(tmp->draw.stmts == whilehead || tmp->draw.stmts == ifhead)
+				{	
+					tmp->draw.clr = GREEN;
+					tmp->draw.strClr = GREEN;	
+			
+					struct list *color;
+					int n = 1;
+					for(color = tmp->next; n > 0; color = color->next)
+					{
+						if(color->draw.stmts == whilehead || color->draw.stmts == ifhead) n++;
+						if(color->draw.stmts == whiletail || color->draw.stmts == iftail) n--;
+						
+						color->draw.clr = GREEN;
+						color->draw.strClr = GREEN;	
+					}
+				} else
+				{
+					save = tmp;
+					tmp->draw.clr = GREEN;
+					tmp->draw.strClr = GREEN;
+				}
+				movEnable = 1;
+			} else if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmp->draw.collisionRec) && movEnable == 1)
+			{
+				if(tmp->next != save)
+				{
+					if(save->draw.stmts == whilehead || save->draw.stmts == ifhead)
+					{
+						struct list *insert;
+						for(insert = list; insert->next != save; insert = insert->next);
+						
+						int i;
+						for(i = 0; i < blockLength; i++)
+						{
+							tmp = insertNext(tmp, insert->next->draw.stmts, unifont);
+							tmp = tmp->next;
+							insert = insert->next;
+						}
+					} else
+					{
+						struct list *del;
+						for(del = list; del->next != save; del = del->next);
+						del = deleteNext(del);
+						
+						tmp = insertNext(tmp, save->draw.stmts, unifont);
+					}
+					
+					struct list *color;
+					for(color = list; color->next != NULL; )
+					{
+						if(color->next->draw.clr.r == 0   &&
+						   color->next->draw.clr.g == 228 &&
+						   color->next->draw.clr.b == 48  &&
+						   color->next->draw.clr.a == 255)
+						{
+							color = deleteNext(color);
+						} else
+						{
+							color = color->next;
+						}
+					}
+				} else /* don't do anything if dragged to original position */
+				{
+					struct list *color;
+					for(color = list->next; color != NULL; color = color->next)
+					{
+						color->draw.clr = BLUE;
+						color->draw.strClr = RAYWHITE;
+					}
+				}
+				
+				movEnable = 0;
+					
+				list = setOffset(list);
+			}
+		}
+		
+		if(movEnable == 1) hover(msPos, list);
 		
 		ClearBackground(RAYWHITE);
 		EndDrawing();
