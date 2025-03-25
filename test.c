@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "raylib.h"
 
 enum stmts
@@ -28,6 +29,12 @@ struct draw
 	Color clr;
 	char *str;
 	Color strClr;
+	char *optVar1;
+	Vector2 optVar1Pos;
+	char *optVar2;
+	Vector2 optVar2Pos;
+	char *optCond;
+	Vector2 optCondPos;
 };
 
 struct list
@@ -41,19 +48,93 @@ struct list * insertNext(struct list *list, enum stmts stmt, Font fnt)
 	struct draw tempDraw;
 	tempDraw.stmts = stmt;
 	
-	char *tempStr;
+	tempDraw.optVar1 = " ";
+	tempDraw.optVar2 = " ";
+	tempDraw.optCond = " ";
+	
+	char *tempStr = calloc(1, 1);
+	int totalSize;
 	switch(stmt)
 	{
-		case add: tempStr = "add 5 to i"; break;
-		case sub: tempStr = "sub 5 from i"; break;
-		case mult: tempStr = "multiply i by 5"; break;
-		case move: tempStr = "move turtle forward i px"; break;
+		case add:
+			totalSize = strlen(tempDraw.optVar1) + strlen(tempDraw.optVar2) + 9;
+			tempStr = realloc(tempStr, totalSize);
+			strcat(tempStr, "add ");
+			strcat(tempStr, tempDraw.optVar1);
+			tempDraw.optVar1Pos = MeasureTextEx(fnt, tempStr, 16, 1);
+			strcat(tempStr, " to ");
+			strcat(tempStr, tempDraw.optVar2);
+			tempDraw.optVar2Pos = MeasureTextEx(fnt, tempStr, 16, 1);
+		break;
+		
+		case sub:
+			totalSize = strlen(tempDraw.optVar1) + strlen(tempDraw.optVar2) + 11;
+			tempStr = realloc(tempStr, totalSize);
+			strcat(tempStr, "sub ");
+			strcat(tempStr, tempDraw.optVar1);
+			strcat(tempStr, " from ");
+			strcat(tempStr, tempDraw.optVar2);
+		break;
+		
+		case mult:
+			totalSize = strlen(tempDraw.optVar1) + strlen(tempDraw.optVar2) + 14;
+			tempStr = realloc(tempStr, totalSize);
+			strcat(tempStr, "multiply ");
+			strcat(tempStr, tempDraw.optVar1);
+			strcat(tempStr, " by ");
+			strcat(tempStr, tempDraw.optVar2);
+		break;
+		
+		case move:
+			totalSize = strlen(tempDraw.optVar1) + 24;
+			tempStr = realloc(tempStr, totalSize);
+			strcat(tempStr, "move turtle forward ");
+			strcat(tempStr, tempDraw.optVar1);
+			strcat(tempStr, " px");
+		break;
+		
 		case turn: tempStr = "turn turtle left i degrees"; break;
-		case set: tempStr = "set i equal to 5"; break;
-		case let: tempStr = "let i equal 5"; break;
-		case whilehead: tempStr = "while i islessthan 5 do"; break;
+		
+		case set:
+			totalSize = strlen(tempDraw.optVar1) + strlen(tempDraw.optVar2) + 15;
+			tempStr = realloc(tempStr, totalSize);
+			strcat(tempStr, "set ");
+			strcat(tempStr, tempDraw.optVar1);
+			strcat(tempStr, " equal to ");
+			strcat(tempStr, tempDraw.optVar2);
+		break;
+		
+		case let:
+			totalSize = strlen(tempDraw.optVar1) + strlen(tempDraw.optVar2) + 12;
+			tempStr = realloc(tempStr, totalSize);
+			strcat(tempStr, "let ");
+			strcat(tempStr, tempDraw.optVar1);
+			strcat(tempStr, " equal ");
+			strcat(tempStr, tempDraw.optVar2);
+		break;
+		
+		case whilehead:
+			totalSize = strlen(tempDraw.optVar1) + strlen(tempDraw.optCond) + strlen(tempDraw.optVar2) + 10;
+			tempStr = realloc(tempStr, totalSize);
+			strcat(tempStr, "while ");
+			strcat(tempStr, tempDraw.optVar1);
+			strcat(tempStr, tempDraw.optCond);
+			strcat(tempStr, tempDraw.optVar2);
+			strcat(tempStr, " do");
+		break;
+		
 		case whiletail: tempStr = "end while"; break;
-		case ifhead: tempStr = "if i islessthan 5 then"; break;
+		
+		case ifhead:
+			totalSize = strlen(tempDraw.optVar1) + strlen(tempDraw.optCond) + strlen(tempDraw.optVar2) + 9;
+			tempStr = realloc(tempStr, totalSize);
+			strcat(tempStr, "if ");
+			strcat(tempStr, tempDraw.optVar1);
+			strcat(tempStr, tempDraw.optCond);
+			strcat(tempStr, tempDraw.optVar2);
+			strcat(tempStr, " then");
+		break;
+		
 		case iftail: tempStr = "end if"; break;
 	}
 	
@@ -94,8 +175,14 @@ struct list * setOffset(struct list *list)
 	for(tmp = list->next; tmp != NULL; tmp = tmp->next)
 	{
 		if(tmp->draw.stmts == whiletail ||
-		   tmp->draw.stmts == iftail) xoffset -= 20;
-	
+		   tmp->draw.stmts == iftail)
+		{
+			xoffset -= 20;	
+			tmp->draw.optVar1Pos.x -= 20;
+			tmp->draw.optVar2Pos.x -= 20;	
+			tmp->draw.optCondPos.x -= 20;
+		}
+		
 		tmp->draw.rec.x = xoffset;
 		tmp->draw.rec.y = yoffset;
 		
@@ -103,9 +190,18 @@ struct list * setOffset(struct list *list)
 		tmp->draw.collisionRec.y = tmp->draw.rec.y+10;
 		
 		if(tmp->draw.stmts == whilehead ||
-		   tmp->draw.stmts == ifhead) xoffset += 20;
+		   tmp->draw.stmts == ifhead)
+		{
+			xoffset += 20;
+			tmp->draw.optVar1Pos.x += 20;
+			tmp->draw.optVar2Pos.x += 20;	
+			tmp->draw.optCondPos.x += 20;
+		}
 		
 		yoffset += 20;
+		tmp->draw.optVar1Pos.y += 20;
+		tmp->draw.optVar2Pos.y += 20;
+		tmp->draw.optCondPos.y += 20;
 	}
 	
 	return list;
@@ -127,6 +223,8 @@ void drawVals(struct list *list, Font fnt)
 	{
 		Vector2 strPos = {tmp->draw.rec.x+2, tmp->draw.rec.y+2};
 		DrawRectangleRec(tmp->draw.rec, tmp->draw.clr);
+		//DrawRec(tmp->draw.optVar1Pos.x, tmp->draw.optVar1Pos.y, 8, RED);
+		//DrawCircle(tmp->draw.optVar2Pos.x, tmp->draw.optVar2Pos.y, 8, RED);
 		DrawTextEx(fnt, tmp->draw.str, strPos, 16, 1, tmp->draw.strClr);
 	}
 }
@@ -177,6 +275,140 @@ void drawButtons(struct btns *buttons, Font fnt)
 	}
 }
 
+struct vars
+{
+	char *str;
+	Vector2 pos;
+	int rad;
+	int type;
+};
+
+struct vars * createVariables(struct vars *variables, Font fnt)
+{
+	char *str[9] = {"a", "b", "c", "d", "e", "f", "g", "h", "i"};
+	
+	int xoffset = 100, yoffset = 308;
+	
+	int i;
+	for(i = 0; i<9; i++)
+	{
+		variables[i].type = i;
+		
+		variables[i].pos.x = xoffset;
+		variables[i].pos.y = yoffset;
+		variables[i].rad = 8;
+		
+		variables[i].str = str[i];
+		
+		yoffset += 16;
+	}
+	
+	return variables;
+}
+
+void drawVariables(struct vars *variables, Font fnt)
+{
+	int i;
+	for(i = 0; i<9; i++)
+	{
+		Vector2 strPos = {variables[i].pos.x-4, variables[i].pos.y-9};
+		DrawCircle(variables[i].pos.x, variables[i].pos.y, (float)variables[i].rad, ORANGE);
+		DrawTextEx(fnt, variables[i].str, strPos, 16, 1, WHITE);
+	}
+}
+
+struct conds
+{
+	char *str;
+	Rectangle box;
+	int type;
+};
+
+struct conds * createConditionals(struct conds *conditionals, Font fnt)
+{
+	char *str[3] = {"islessthan", "isgreaterthan", "isequalto"};
+	
+	int xoffset = 150, yoffset = 300;
+	
+	int i;
+	for(i = 0; i<3; i++)
+	{
+		conditionals[i].type = i;
+		
+		Vector2 size = MeasureTextEx(fnt, str[i], 16, 1);
+		int width = size.x+5;
+		int height = size.y+5;
+		
+		conditionals[i].box.x = xoffset;
+		conditionals[i].box.y = yoffset;
+		conditionals[i].box.width = width;
+		conditionals[i].box.height = height;
+		
+		conditionals[i].str = str[i];
+		
+		yoffset += 20;
+	}
+	
+	return conditionals;
+}
+
+void drawConditionals(struct conds *conditionals, Font fnt)
+{
+	int i;
+	for(i = 0; i<3; i++)
+	{
+		Vector2 strPos = {conditionals[i].box.x+2, conditionals[i].box.y+2};
+		DrawRectangleRec(conditionals[i].box, PURPLE);
+		DrawTextEx(fnt, conditionals[i].str, strPos, 16, 1, WHITE);
+	}
+}
+
+struct dirs
+{
+	char *str;
+	Rectangle box;
+	int type;
+};
+
+struct dirs * createDirections(struct dirs *directions, Font fnt)
+{
+	char *str[4] = {"forward", "backward", "left", "right"};
+	
+	int xoffset = 300, yoffset = 300;
+	
+	int i;
+	for(i = 0; i<4; i++)
+	{
+		directions[i].type = i;
+		
+		Vector2 size = MeasureTextEx(fnt, str[i], 16, 1);
+		int width = size.x+5;
+		int height = size.y+5;
+		
+		directions[i].box.x = xoffset;
+		directions[i].box.y = yoffset;
+		directions[i].box.width = width;
+		directions[i].box.height = height;
+		
+		directions[i].str = str[i];
+		
+		yoffset += 20;
+	}
+	
+	return directions;
+}
+
+void drawDirections(struct dirs *directions, Font fnt)
+{
+	int i;
+	for(i = 0; i<4; i++)
+	{
+		Vector2 strPos = {directions[i].box.x+2, directions[i].box.y+2};
+		DrawRectangleRec(directions[i].box, RED);
+		DrawTextEx(fnt, directions[i].str, strPos, 16, 1, WHITE);
+	}
+}
+
 int hover(Vector2 msPos, struct list *list)
 {
 	/* draw green line below instructions */
@@ -221,6 +453,9 @@ int main(void)
 	list->draw.collisionRec.height = 10;
 	
 	struct btns *buttons = malloc(9 * sizeof(struct btns));
+	struct vars *variables = malloc(9 * sizeof(struct vars));
+	struct conds *conditionals = malloc(3 * sizeof(struct conds));
+	struct dirs *directions = malloc(3 * sizeof(struct dirs));
 	
 	InitWindow(500, 500, "test");
 	
@@ -228,6 +463,9 @@ int main(void)
 	
 	Font unifont = LoadFont("unifont.otf");
 	buttons = createButtons(buttons, unifont);
+	variables = createVariables(variables, unifont);
+	conditionals = createConditionals(conditionals, unifont);
+	directions = createDirections(directions, unifont);
 	
 	enum stmts stmt;
 	int whilecond = 0, ifcond = 0;
@@ -247,6 +485,9 @@ int main(void)
 		
 		drawVals(list, unifont);
 		drawButtons(buttons, unifont);
+		drawVariables(variables, unifont);
+		drawConditionals(conditionals, unifont);
+		drawDirections(directions, unifont);
 		
 		Vector2 msPos = GetMousePosition();
 		
@@ -320,14 +561,18 @@ int main(void)
 			}
 		}
 		
+		/**********************************
+		* dragging code below, do not touch
+		**********************************/
+		
 		/* if one of the instructions is dragged */
 		for(tmp = list; tmp != NULL; tmp = tmp->next)
 		{
 			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmp->draw.rec) && tmp->draw.stmts != whiletail && tmp->draw.stmts != iftail && movEnable == 0)
 			{
+				save = tmp;
 				if(tmp->draw.stmts == whilehead || tmp->draw.stmts == ifhead)
 				{
-					save = tmp;
 					int tempLength = 1;
 					
 					struct list *l;
@@ -360,14 +605,25 @@ int main(void)
 					}
 				} else
 				{
-					save = tmp;
 					tmp->draw.clr = GREEN;
 					tmp->draw.strClr = GREEN;
 				}
 				movEnable = 1;
 			} else if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmp->draw.collisionRec) && movEnable == 1)
 			{
-				if(tmp->next != save)
+				int unable = 0;
+				if(save->draw.stmts == whilehead || save->draw.stmts == ifhead)
+				{
+					struct list *test;
+					int i = 0;
+					for(test = save; i<blockLength; i++)
+					{
+						if(test == tmp) unable = 1;
+						test = test->next;
+					}
+				}
+				
+				if(tmp->next != save && tmp->next != save->next && unable == 0)
 				{
 					if(save->draw.stmts == whilehead || save->draw.stmts == ifhead)
 					{
@@ -404,23 +660,36 @@ int main(void)
 							color = color->next;
 						}
 					}
-				} else /* don't do anything if dragged to original position */
-				{
-					struct list *color;
-					for(color = list->next; color != NULL; color = color->next)
-					{
-						color->draw.clr = BLUE;
-						color->draw.strClr = RAYWHITE;
-					}
 				}
 				
 				movEnable = 0;
-					
+				
 				list = setOffset(list);
 			}
 		}
 		
-		if(movEnable == 1) hover(msPos, list);
+		if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
+		{
+			movEnable = 0;
+			btnEnable = 0;
+		}
+		
+		if(movEnable == 1)
+		{
+			hover(msPos, list);
+		} else
+		{
+			struct list *color;
+			for(color = list->next; color != NULL; color = color->next)
+			{
+				color->draw.clr = BLUE;
+				color->draw.strClr = RAYWHITE;
+			}
+		}
+		
+		/**********************************
+		* dragging code above, do not touch
+		**********************************/
 		
 		ClearBackground(RAYWHITE);
 		EndDrawing();
