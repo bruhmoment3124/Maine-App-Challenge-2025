@@ -2,26 +2,45 @@
 #include <stdlib.h>
 #include <string.h>
 #include "raylib.h"
+#include "stuff.h"
 
 enum stmts
 {
-	start,
-	add,
-	sub,
-	mult,
-	move,
-	turn,
-	set,
-	let,
-	whilehead,
-	whiletail,
-	ifhead,
-	iftail
+	start_st,
+	add_st,
+	sub_st,
+	mult_st,
+	move_st,
+	turn_st,
+	set_st,
+	let_st,
+	whilehead_st,
+	whiletail_st,
+	ifhead_st,
+	iftail_st
+};
+
+enum instType_gr
+{
+	reg_gr,
+	var_gr,
+	cond_gr,
+	dir_gr
+};
+
+struct inst_gr
+{
+	enum instType_gr type;
+	char *text;
+	Rectangle rec;
+	Color clr;
+	struct inst_gr *next;
 };
 
 struct draw
 {
 	enum stmts stmts;
+	struct inst_gr *inst;
 	Rectangle rec;
 	int xoffset;
 	int yoffset;
@@ -29,12 +48,6 @@ struct draw
 	Color clr;
 	char *str;
 	Color strClr;
-	char *optVar1;
-	Vector2 optVar1Pos;
-	char *optVar2;
-	Vector2 optVar2Pos;
-	char *optCond;
-	Vector2 optCondPos;
 };
 
 struct list
@@ -43,112 +56,226 @@ struct list
 	struct list *next;
 };
 
-struct list * insertNext(struct list *list, enum stmts stmt, Font fnt)
+struct inst_gr * createInst(struct inst_gr *inst, enum instType_gr type, char *text, Font fnt)
+{
+	inst = realloc(inst, sizeof(struct inst_gr));
+	inst->type = type;
+	
+	inst->text = calloc(strlen(text)+1, 1);
+	strcat(inst->text, text);
+	
+	Vector2 size = MeasureTextEx(fnt, inst->text, 16, 1);
+	inst->rec.width = size.x+4;
+	inst->rec.height = size.y+4;
+	
+	inst->next = NULL;
+	
+	return inst;
+}
+
+/* change one of the parts of an instruction */
+struct inst_gr * changeInst(struct inst_gr *inst, char *text, Font fnt)
+{
+	inst->text = realloc(inst->text, strlen(text)+1);
+	memset(inst->text, 0, strlen(text)+1);
+	strcat(inst->text, text);
+	
+	Vector2 size = MeasureTextEx(fnt, inst->text, 16, 1);
+	inst->rec.width = size.x+4;
+	inst->rec.height = size.y+4;
+	
+	return inst;
+}
+
+struct inst_gr * setOffsetX(struct inst_gr *inst, int xoffset, int yoffset)
+{
+	int tmpXoffset = xoffset;
+	int tmpYoffset = yoffset;
+	
+	struct inst_gr *tmp;
+	for(tmp = inst; tmp != NULL; tmp = tmp->next)
+	{
+		tmp->rec.x = tmpXoffset;
+		tmp->rec.y = tmpYoffset;
+		tmpXoffset += tmp->rec.width;
+	}
+	
+	return inst;
+}
+
+struct list * setGreen(struct list *list)
+{
+	struct inst_gr *tmp;
+	for(tmp = list->draw.inst; tmp != NULL; tmp = tmp->next) tmp->clr = GREEN;
+	
+	return list;
+}
+
+struct list * setBack(struct list *list)
+{
+	struct inst_gr *tmp;
+	for(tmp = list->draw.inst; tmp != NULL; tmp = tmp->next)
+	{
+		switch(tmp->type)
+		{
+			case reg_gr:
+				tmp->clr = BLUE;
+			break;
+			
+			case var_gr:
+				tmp->clr = ORANGE;
+			break;
+			
+			case cond_gr:
+				tmp->clr = PURPLE;
+			break;
+			
+			case dir_gr:	
+				tmp->clr = RED;
+			break;
+		}
+	}
+	
+	return list;
+}
+
+
+void drawInst(struct inst_gr *inst, Font fnt)
+{
+	struct inst_gr *tmp;
+	for(tmp = inst; tmp != NULL; tmp = tmp->next)
+	{
+		Vector2 pos = {tmp->rec.x+2, tmp->rec.y+2};
+		DrawRectangleRec(tmp->rec, tmp->clr);
+		DrawTextEx(fnt, tmp->text, pos, 16, 1, WHITE);
+	}
+}
+
+struct list * insertNext(struct list *list, enum stmts stmt, Font fnt, char *optVar1, char *optVar2, char *optCond, char *optDir)
 {
 	struct draw tempDraw;
 	tempDraw.stmts = stmt;
-	
-	tempDraw.optVar1 = " ";
-	tempDraw.optVar2 = " ";
-	tempDraw.optCond = " ";
-	
-	char *tempStr = calloc(1, 1);
-	int totalSize;
+
+	if(optVar1 == NULL) optVar1 = "   ";
+	if(optVar2 == NULL) optVar2 = "   ";
+	if(optCond == NULL) optCond = "   ";
+	if(optDir == NULL) optDir = "   ";
+
 	switch(stmt)
 	{
-		case add:
-			totalSize = strlen(tempDraw.optVar1) + strlen(tempDraw.optVar2) + 9;
-			tempStr = realloc(tempStr, totalSize);
-			strcat(tempStr, "add ");
-			strcat(tempStr, tempDraw.optVar1);
-			tempDraw.optVar1Pos = MeasureTextEx(fnt, tempStr, 16, 1);
-			strcat(tempStr, " to ");
-			strcat(tempStr, tempDraw.optVar2);
-			tempDraw.optVar2Pos = MeasureTextEx(fnt, tempStr, 16, 1);
+		case add_st:
+			tempDraw.inst = createInst(tempDraw.inst, reg_gr, "add", fnt);
+			tempDraw.inst->clr = BLUE;
+			tempDraw.inst->next = createInst(tempDraw.inst->next, var_gr, optVar1, fnt);
+			tempDraw.inst->next->clr = ORANGE;
+			tempDraw.inst->next->next = createInst(tempDraw.inst->next->next, reg_gr, "to", fnt);
+			tempDraw.inst->next->next->clr = BLUE;
+			tempDraw.inst->next->next->next = createInst(tempDraw.inst->next->next->next, var_gr, optVar2, fnt);
+			tempDraw.inst->next->next->next->clr = ORANGE;
 		break;
 		
-		case sub:
-			totalSize = strlen(tempDraw.optVar1) + strlen(tempDraw.optVar2) + 11;
-			tempStr = realloc(tempStr, totalSize);
-			strcat(tempStr, "sub ");
-			strcat(tempStr, tempDraw.optVar1);
-			strcat(tempStr, " from ");
-			strcat(tempStr, tempDraw.optVar2);
+		case sub_st:
+			tempDraw.inst = createInst(tempDraw.inst, reg_gr, "subtract", fnt);
+			tempDraw.inst->clr = BLUE;
+			tempDraw.inst->next = createInst(tempDraw.inst->next, var_gr, optVar1, fnt);
+			tempDraw.inst->next->clr = ORANGE;
+			tempDraw.inst->next->next = createInst(tempDraw.inst->next->next, reg_gr, "from", fnt);
+			tempDraw.inst->next->next->clr = BLUE;
+			tempDraw.inst->next->next->next = createInst(tempDraw.inst->next->next->next, var_gr, optVar2, fnt);
+			tempDraw.inst->next->next->next->clr = ORANGE;
 		break;
 		
-		case mult:
-			totalSize = strlen(tempDraw.optVar1) + strlen(tempDraw.optVar2) + 14;
-			tempStr = realloc(tempStr, totalSize);
-			strcat(tempStr, "multiply ");
-			strcat(tempStr, tempDraw.optVar1);
-			strcat(tempStr, " by ");
-			strcat(tempStr, tempDraw.optVar2);
+		case mult_st:
+			tempDraw.inst = createInst(tempDraw.inst, reg_gr, "multiply", fnt);
+			tempDraw.inst->clr = BLUE;
+			tempDraw.inst->next = createInst(tempDraw.inst->next, var_gr, optVar1, fnt);
+			tempDraw.inst->next->clr = ORANGE;
+			tempDraw.inst->next->next = createInst(tempDraw.inst->next->next, reg_gr, "by", fnt);
+			tempDraw.inst->next->next->clr = BLUE;
+			tempDraw.inst->next->next->next = createInst(tempDraw.inst->next->next->next, var_gr, optVar2, fnt);
+			tempDraw.inst->next->next->next->clr = ORANGE;
 		break;
 		
-		case move:
-			totalSize = strlen(tempDraw.optVar1) + 24;
-			tempStr = realloc(tempStr, totalSize);
-			strcat(tempStr, "move turtle forward ");
-			strcat(tempStr, tempDraw.optVar1);
-			strcat(tempStr, " px");
+		case move_st:
+			tempDraw.inst = createInst(tempDraw.inst, reg_gr, "move turtle", fnt);
+			tempDraw.inst->clr = BLUE;
+			tempDraw.inst->next = createInst(tempDraw.inst->next, dir_gr, optDir, fnt);
+			tempDraw.inst->next->clr = RED;
+			tempDraw.inst->next->next = createInst(tempDraw.inst->next->next, var_gr, optVar1, fnt);
+			tempDraw.inst->next->next->clr = ORANGE;
+			tempDraw.inst->next->next->next = createInst(tempDraw.inst->next->next->next, reg_gr, "px", fnt);
+			tempDraw.inst->next->next->next->clr = BLUE;
 		break;
 		
-		case turn: tempStr = "turn turtle left i degrees"; break;
-		
-		case set:
-			totalSize = strlen(tempDraw.optVar1) + strlen(tempDraw.optVar2) + 15;
-			tempStr = realloc(tempStr, totalSize);
-			strcat(tempStr, "set ");
-			strcat(tempStr, tempDraw.optVar1);
-			strcat(tempStr, " equal to ");
-			strcat(tempStr, tempDraw.optVar2);
+		case turn_st:
+			tempDraw.inst = createInst(tempDraw.inst, reg_gr, "turn", fnt);
+			tempDraw.inst->clr = BLUE;
+			tempDraw.inst->next = createInst(tempDraw.inst->next, dir_gr, optDir, fnt);
+			tempDraw.inst->next->clr = RED;
+			tempDraw.inst->next->next = createInst(tempDraw.inst->next->next, var_gr, optVar1, fnt);
+			tempDraw.inst->next->next->clr = ORANGE;
+			tempDraw.inst->next->next->next = createInst(tempDraw.inst->next->next->next, reg_gr, "degrees", fnt);
+			tempDraw.inst->next->next->next->clr = BLUE;
 		break;
 		
-		case let:
-			totalSize = strlen(tempDraw.optVar1) + strlen(tempDraw.optVar2) + 12;
-			tempStr = realloc(tempStr, totalSize);
-			strcat(tempStr, "let ");
-			strcat(tempStr, tempDraw.optVar1);
-			strcat(tempStr, " equal ");
-			strcat(tempStr, tempDraw.optVar2);
+		case set_st:
+			tempDraw.inst = createInst(tempDraw.inst, reg_gr, "set", fnt);
+			tempDraw.inst->clr = BLUE;
+			tempDraw.inst->next = createInst(tempDraw.inst->next, var_gr, optVar1, fnt);
+			tempDraw.inst->next->clr = ORANGE;
+			tempDraw.inst->next->next = createInst(tempDraw.inst->next->next, reg_gr, "equal to", fnt);
+			tempDraw.inst->next->next->clr = BLUE;
+			tempDraw.inst->next->next->next = createInst(tempDraw.inst->next->next->next, var_gr, optVar2, fnt);
+			tempDraw.inst->next->next->next->clr = ORANGE;
 		break;
 		
-		case whilehead:
-			totalSize = strlen(tempDraw.optVar1) + strlen(tempDraw.optCond) + strlen(tempDraw.optVar2) + 10;
-			tempStr = realloc(tempStr, totalSize);
-			strcat(tempStr, "while ");
-			strcat(tempStr, tempDraw.optVar1);
-			strcat(tempStr, tempDraw.optCond);
-			strcat(tempStr, tempDraw.optVar2);
-			strcat(tempStr, " do");
+		case let_st:
+			tempDraw.inst = createInst(tempDraw.inst, reg_gr, "let", fnt);
+			tempDraw.inst->clr = BLUE;
+			tempDraw.inst->next = createInst(tempDraw.inst->next, var_gr, optVar1, fnt);
+			tempDraw.inst->next->clr = ORANGE;
+			tempDraw.inst->next->next = createInst(tempDraw.inst->next->next, reg_gr, "equal", fnt);
+			tempDraw.inst->next->next->clr = BLUE;
+			tempDraw.inst->next->next->next = createInst(tempDraw.inst->next->next->next, var_gr, optVar2, fnt);
+			tempDraw.inst->next->next->next->clr = ORANGE;
 		break;
 		
-		case whiletail: tempStr = "end while"; break;
-		
-		case ifhead:
-			totalSize = strlen(tempDraw.optVar1) + strlen(tempDraw.optCond) + strlen(tempDraw.optVar2) + 9;
-			tempStr = realloc(tempStr, totalSize);
-			strcat(tempStr, "if ");
-			strcat(tempStr, tempDraw.optVar1);
-			strcat(tempStr, tempDraw.optCond);
-			strcat(tempStr, tempDraw.optVar2);
-			strcat(tempStr, " then");
+		case whilehead_st:
+			tempDraw.inst = createInst(tempDraw.inst, reg_gr, "while", fnt);
+			tempDraw.inst->clr = BLUE;
+			tempDraw.inst->next = createInst(tempDraw.inst->next, var_gr, optVar1, fnt);
+			tempDraw.inst->next->clr = ORANGE;
+			tempDraw.inst->next->next = createInst(tempDraw.inst->next->next, cond_gr, optCond, fnt);
+			tempDraw.inst->next->next->clr = PURPLE;
+			tempDraw.inst->next->next->next = createInst(tempDraw.inst->next->next->next, var_gr, optVar2, fnt);
+			tempDraw.inst->next->next->next->clr = ORANGE;
+			tempDraw.inst->next->next->next->next = createInst(tempDraw.inst->next->next->next->next, reg_gr, "do", fnt);
+			tempDraw.inst->next->next->next->next->clr = BLUE;
 		break;
 		
-		case iftail: tempStr = "end if"; break;
+		case whiletail_st:
+			tempDraw.inst = createInst(tempDraw.inst, reg_gr, "end while", fnt);
+			tempDraw.inst->clr = BLUE;
+		break;
+		
+		case ifhead_st:
+			tempDraw.inst = createInst(tempDraw.inst, reg_gr, "if", fnt);
+			tempDraw.inst->clr = BLUE;
+			tempDraw.inst->next = createInst(tempDraw.inst->next, var_gr, optVar1, fnt);
+			tempDraw.inst->next->clr = ORANGE;
+			tempDraw.inst->next->next = createInst(tempDraw.inst->next->next, cond_gr, optCond, fnt);
+			tempDraw.inst->next->next->clr = PURPLE;
+			tempDraw.inst->next->next->next = createInst(tempDraw.inst->next->next->next, var_gr, optVar2, fnt);
+			tempDraw.inst->next->next->next->clr = ORANGE;
+			tempDraw.inst->next->next->next->next = createInst(tempDraw.inst->next->next->next->next, reg_gr, "then", fnt);
+			tempDraw.inst->next->next->next->next->clr = BLUE;
+		break;
+		
+		case iftail_st:
+			tempDraw.inst = createInst(tempDraw.inst, reg_gr, "end if", fnt);
+			tempDraw.inst->clr = BLUE;
+		break;
 	}
-	
-	Vector2 size = MeasureTextEx(fnt, tempStr, 16, 1);
-	tempDraw.rec.width = size.x+5;
-	tempDraw.rec.height = size.y+5;
-	
-	tempDraw.clr = BLUE;
-	tempDraw.strClr = WHITE;
-	
-	tempDraw.collisionRec.width = tempDraw.rec.width;
-	tempDraw.collisionRec.height = tempDraw.rec.height-2;
-	
-	tempDraw.str = tempStr;
 	
 	struct list *tmpNode;
 	if(list->next != NULL)
@@ -174,34 +301,21 @@ struct list * setOffset(struct list *list)
 	struct list *tmp;
 	for(tmp = list->next; tmp != NULL; tmp = tmp->next)
 	{
-		if(tmp->draw.stmts == whiletail ||
-		   tmp->draw.stmts == iftail)
+		if(tmp->draw.stmts == whiletail_st ||
+		   tmp->draw.stmts == iftail_st)
 		{
-			xoffset -= 20;	
-			tmp->draw.optVar1Pos.x -= 20;
-			tmp->draw.optVar2Pos.x -= 20;	
-			tmp->draw.optCondPos.x -= 20;
+			xoffset -= 20;
 		}
 		
-		tmp->draw.rec.x = xoffset;
-		tmp->draw.rec.y = yoffset;
+		tmp->draw.inst = setOffsetX(tmp->draw.inst, xoffset, yoffset);
 		
-		tmp->draw.collisionRec.x = tmp->draw.rec.x;
-		tmp->draw.collisionRec.y = tmp->draw.rec.y+10;
-		
-		if(tmp->draw.stmts == whilehead ||
-		   tmp->draw.stmts == ifhead)
+		if(tmp->draw.stmts == whilehead_st ||
+		   tmp->draw.stmts == ifhead_st)
 		{
 			xoffset += 20;
-			tmp->draw.optVar1Pos.x += 20;
-			tmp->draw.optVar2Pos.x += 20;	
-			tmp->draw.optCondPos.x += 20;
 		}
 		
 		yoffset += 20;
-		tmp->draw.optVar1Pos.y += 20;
-		tmp->draw.optVar2Pos.y += 20;
-		tmp->draw.optCondPos.y += 20;
 	}
 	
 	return list;
@@ -219,14 +333,7 @@ struct list * deleteNext(struct list *list)
 void drawVals(struct list *list, Font fnt)
 {
 	struct list *tmp;
-	for(tmp = list->next; tmp != NULL; tmp = tmp->next)
-	{
-		Vector2 strPos = {tmp->draw.rec.x+2, tmp->draw.rec.y+2};
-		DrawRectangleRec(tmp->draw.rec, tmp->draw.clr);
-		//DrawRec(tmp->draw.optVar1Pos.x, tmp->draw.optVar1Pos.y, 8, RED);
-		//DrawCircle(tmp->draw.optVar2Pos.x, tmp->draw.optVar2Pos.y, 8, RED);
-		DrawTextEx(fnt, tmp->draw.str, strPos, 16, 1, tmp->draw.strClr);
-	}
+	for(tmp = list->next; tmp != NULL; tmp = tmp->next) drawInst(tmp->draw.inst, fnt);
 }
 
 struct btns
@@ -409,16 +516,55 @@ void drawDirections(struct dirs *directions, Font fnt)
 	}
 }
 
-int hover(Vector2 msPos, struct list *list)
+int collideInstPressed(Vector2 msPos, struct inst_gr *inst)
+{
+	struct inst_gr *tmp;
+	for(tmp = inst; tmp != NULL; tmp = tmp->next)
+	{
+		Rectangle tempRec = {tmp->rec.x, tmp->rec.y, tmp->rec.width, tmp->rec.height};
+		if(CheckCollisionPointRec(msPos, tempRec)) return 1;
+	}
+	
+	return 0;
+}
+
+int collideInstRelease(Vector2 msPos, struct inst_gr *inst)
+{
+	struct inst_gr *tmp;
+	for(tmp = inst; tmp != NULL; tmp = tmp->next)
+	{
+		Rectangle tempRec = {tmp->rec.x, tmp->rec.y+10, tmp->rec.width, tmp->rec.height};
+		if(CheckCollisionPointRec(msPos, tempRec)) return 1;
+	}
+	
+	return 0;
+}
+
+int drawUnderline(Vector2 msPos, struct inst_gr *inst)
+{
+	struct inst_gr *tmp;
+	for(tmp = inst; tmp != NULL; tmp = tmp->next)
+	{
+		Rectangle tempRec = {tmp->rec.x, tmp->rec.y+10, tmp->rec.width, tmp->rec.height};
+		if(CheckCollisionPointRec(msPos, tempRec)) return 1;
+	}
+	
+	return 0;
+}
+
+void hover(Vector2 msPos, struct list *list)
 {
 	/* draw green line below instructions */
 	struct list *tmp;
 	for(tmp = list->next; tmp != NULL; tmp = tmp->next)
 	{
-		if(CheckCollisionPointRec(msPos, tmp->draw.collisionRec))
+		if(drawUnderline(msPos, tmp->draw.inst))
 		{
-			DrawRectangle(tmp->draw.rec.x, tmp->draw.rec.y+18, tmp->draw.rec.width, 2, GREEN);
-			return 1;
+			struct inst_gr *i;
+			for(i = tmp->draw.inst; i != NULL; i = i->next)
+			{
+				DrawRectangle(i->rec.x, i->rec.y+18, i->rec.width, 2, GREEN);
+			}
 		}
 	}
 	
@@ -432,17 +578,45 @@ int hover(Vector2 msPos, struct list *list)
 		{
 			DrawRectangle(list->draw.collisionRec.x, list->draw.collisionRec.y, list->draw.collisionRec.width, 2, RED);
 		}
-		
-		return 1;
 	}
-	
+}
+
+int ColorIsEqual(Color clr1, Color clr2)
+{
+	if(clr1.r == clr2.r &&
+	   clr1.g == clr2.g &&
+	   clr1.b == clr2.b &&
+	   clr1.a == clr2.a) return 1;
+	   
 	return 0;
+}
+
+char * transcribe(struct list *list)
+{
+	int size = 1;
+	char *tmpStr = calloc(1, 1);
+	
+	struct list *tmp;
+	for(tmp = list->next; tmp != NULL; tmp = tmp->next)
+	{
+		struct inst_gr *tmpInst;
+		for(tmpInst = tmp->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
+		{
+			size += strlen(tmpInst->text);
+			if(tmpInst->type == reg_gr) size++;
+			
+			tmpStr = realloc(tmpStr, size);
+			if(tmpInst->type == reg_gr) strcat(tmpStr, " ");
+			strcat(tmpStr, tmpInst->text);
+		}
+	}
 }
 
 int main(void)
 {
+	/* below is instructions and initialization */
 	struct list *list = malloc(sizeof(struct list));
-	list->draw.stmts = start;
+	list->draw.stmts = start_st;
 	list->draw.str = NULL;
 	list->next = NULL;
 	list->draw.xoffset = 0;
@@ -470,12 +644,24 @@ int main(void)
 	enum stmts stmt;
 	int whilecond = 0, ifcond = 0;
 	
-	int btnEnable = 0, movEnable = 0;
+	int btnEnable = 0, movEnable = 0, varEnable = 0, condEnable = 0, dirEnable = 0;
 	
-	int saveInst; /* save button instruction for displaying later */
+	int saveInst, saveVar, saveCond, saveDir; /* save button instruction for displaying later */
+
+	char *optVar[2], *optCond = NULL, *optDir = NULL;
+	optVar[0] = NULL;
+	optVar[1] = NULL;
 
 	struct list *save = NULL;
 	int blockLength = 0;
+	
+	/* above is instructions */
+	
+	/* general ui */
+	Color startBtnClr = GREEN;
+	
+	/* interpreter setup */
+	char *code;
 	
 	while(!WindowShouldClose())
 	{
@@ -499,19 +685,52 @@ int main(void)
 			{
 				switch(buttons[i].type)
 				{
-					case 0: stmt = add; break;
-					case 1: stmt = sub; break;
-					case 2: stmt = mult; break;
-					case 3: stmt = move; break;
-					case 4: stmt = turn; break;
-					case 5: stmt = set; break;
-					case 6: stmt = let; break;
+					case 0: stmt = add_st; break;
+					case 1: stmt = sub_st; break;
+					case 2: stmt = mult_st; break;
+					case 3: stmt = move_st; break;
+					case 4: stmt = turn_st; break;
+					case 5: stmt = set_st; break;
+					case 6: stmt = let_st; break;
 					case 7: whilecond = 1; break;
 					case 8: ifcond = 1; break;
 				}
 				
 				saveInst = i;
 				btnEnable = 1;
+			}
+		}
+		
+		/* if a variable is pressed */
+		int j;
+		for(j = 0; j<9; j++)
+		{
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointCircle(msPos, variables[j].pos, variables[j].rad))
+			{
+				saveVar = j;
+				varEnable = 1;
+			}
+		}
+		
+		/* if a conditional is pressed */
+		int k;
+		for(k = 0; k<4; k++)
+		{
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, conditionals[k].box))
+			{
+				saveCond = k;
+				condEnable = 1;
+			}
+		}
+		
+		/* if a direction is pressed */
+		int l;
+		for(l = 0; l<4; l++)
+		{
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, directions[l].box))
+			{
+				saveDir = l;
+				dirEnable = 1;
 			}
 		}
 		
@@ -534,30 +753,77 @@ int main(void)
 			DrawTextEx(unifont, buttons[saveInst].str, strPos, 16, 1, WHITE);
 		}
 		
+		if(varEnable == 1)
+		{
+			DrawCircle(msPos.x, msPos.y, 8, ORANGE);
+			
+			/* text position and drawing */
+			Vector2 strPos = {msPos.x-4, msPos.y-9};
+			DrawTextEx(unifont, variables[saveVar].str, strPos, 16, 1, WHITE);
+		}
+		
+		if(condEnable == 1)
+		{
+			Vector2 tmpSize = MeasureTextEx(unifont, conditionals[saveCond].str, 16, 1);
+			int width = tmpSize.x+5;
+			int height = tmpSize.y+5;
+			
+			/* rectangle position and drawing */
+			Rectangle tempRec = {msPos.x - (int)(width/2), msPos.y - (int)(height/2), width, height};
+			DrawRectangleRec(tempRec, PURPLE);
+			
+			/* text position and drawing */
+			Vector2 strPos = {tempRec.x+2, tempRec.y+2};
+			DrawTextEx(unifont, conditionals[saveCond].str, strPos, 16, 1, WHITE);
+		}
+		
+		if(dirEnable == 1)
+		{
+			Vector2 tmpSize = MeasureTextEx(unifont, directions[saveDir].str, 16, 1);
+			int width = tmpSize.x+5;
+			int height = tmpSize.y+5;
+			
+			/* rectangle position and drawing */
+			Rectangle tempRec = {msPos.x - (int)(width/2), msPos.y - (int)(height/2), width, height};
+			DrawRectangleRec(tempRec, RED);
+			
+			/* text position and drawing */
+			Vector2 strPos = {tempRec.x+2, tempRec.y+2};
+			DrawTextEx(unifont, directions[saveDir].str, strPos, 16, 1, WHITE);
+		}
+		
+		/*************************************************************/
+		/*-----------------------------------------------------------*/
+		/*************************************************************/
 		
 		/* check if the mouse button has been released after it has been
 		   pressed, and if it was over a collision area */
 		struct list *tmp;
 		for(tmp = list; tmp != NULL; tmp = tmp->next)
 		{
-			if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmp->draw.collisionRec) && btnEnable == 1)
+			struct inst_gr *tmpInst;
+			for(tmpInst = tmp->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
 			{
-				if(whilecond == 1)
+				if((IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && collideInstRelease(msPos, tmpInst) && btnEnable == 1) ||
+				   (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, list->draw.collisionRec) && btnEnable == 1))
 				{
-					tmp = insertNext(tmp, whiletail, unifont);
-					tmp = insertNext(tmp, whilehead, unifont);
-					whilecond = 0;
-				} else if(ifcond == 1)
-				{
-					tmp = insertNext(tmp, iftail, unifont);
-					tmp = insertNext(tmp, ifhead, unifont);
-					ifcond = 0;
-				} else
-				{
-					tmp = insertNext(tmp, stmt, unifont);
+					if(whilecond == 1)
+					{
+						tmp = insertNext(tmp, whiletail_st, unifont, NULL, NULL, NULL, NULL);
+						tmp = insertNext(tmp, whilehead_st, unifont, NULL, NULL, NULL, NULL);
+						whilecond = 0;
+					} else if(ifcond == 1)
+					{
+						tmp = insertNext(tmp, iftail_st, unifont, NULL, NULL, NULL, NULL);
+						tmp = insertNext(tmp, ifhead_st, unifont, NULL, NULL, NULL, NULL);
+						ifcond = 0;
+					} else
+					{
+						tmp = insertNext(tmp, stmt, unifont, NULL, NULL, NULL, NULL);
+					}
+					list = setOffset(list);
+					btnEnable = 0;
 				}
-				list = setOffset(list);
-				btnEnable = 0;
 			}
 		}
 		
@@ -568,110 +834,198 @@ int main(void)
 		/* if one of the instructions is dragged */
 		for(tmp = list; tmp != NULL; tmp = tmp->next)
 		{
-			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmp->draw.rec) && tmp->draw.stmts != whiletail && tmp->draw.stmts != iftail && movEnable == 0)
+			struct inst_gr *tmpInst;
+			for(tmpInst = tmp->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
 			{
-				save = tmp;
-				if(tmp->draw.stmts == whilehead || tmp->draw.stmts == ifhead)
+				if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && collideInstPressed(msPos, tmpInst) && tmp->draw.stmts != whiletail_st && tmp->draw.stmts != iftail_st && movEnable == 0)
 				{
-					int tempLength = 1;
-					
-					struct list *l;
-					int n = 1;
-					for(l = tmp->next; n > 0; l = l->next)
+					tmp = setGreen(tmp);
+					save = tmp;
+					if(tmp->draw.stmts == whilehead_st || tmp->draw.stmts == ifhead_st)
 					{
-						if(l->draw.stmts == whilehead || l->draw.stmts == ifhead) n++;
-						if(l->draw.stmts == whiletail || l->draw.stmts == iftail) n--;
+						int tempLength = 1;
 						
-						tempLength++;
-					}
-					
-					blockLength = tempLength;
-				}
-				
-				if(tmp->draw.stmts == whilehead || tmp->draw.stmts == ifhead)
-				{	
-					tmp->draw.clr = GREEN;
-					tmp->draw.strClr = GREEN;	
-			
-					struct list *color;
-					int n = 1;
-					for(color = tmp->next; n > 0; color = color->next)
-					{
-						if(color->draw.stmts == whilehead || color->draw.stmts == ifhead) n++;
-						if(color->draw.stmts == whiletail || color->draw.stmts == iftail) n--;
-						
-						color->draw.clr = GREEN;
-						color->draw.strClr = GREEN;	
-					}
-				} else
-				{
-					tmp->draw.clr = GREEN;
-					tmp->draw.strClr = GREEN;
-				}
-				movEnable = 1;
-			} else if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmp->draw.collisionRec) && movEnable == 1)
-			{
-				int unable = 0;
-				if(save->draw.stmts == whilehead || save->draw.stmts == ifhead)
-				{
-					struct list *test;
-					int i = 0;
-					for(test = save; i<blockLength; i++)
-					{
-						if(test == tmp) unable = 1;
-						test = test->next;
-					}
-				}
-				
-				if(tmp->next != save && tmp->next != save->next && unable == 0)
-				{
-					if(save->draw.stmts == whilehead || save->draw.stmts == ifhead)
-					{
-						struct list *insert;
-						for(insert = list; insert->next != save; insert = insert->next);
-						
-						int i;
-						for(i = 0; i < blockLength; i++)
+						struct list *l;
+						int n = 1;
+						for(l = tmp->next; n > 0; l = l->next)
 						{
-							tmp = insertNext(tmp, insert->next->draw.stmts, unifont);
-							tmp = tmp->next;
-							insert = insert->next;
+							if(l->draw.stmts == whilehead_st || l->draw.stmts == ifhead_st) n++;
+							if(l->draw.stmts == whiletail_st || l->draw.stmts == iftail_st) n--;
+							
+							tempLength++;
+						}
+						
+						blockLength = tempLength;
+					}
+					
+					if(tmp->draw.stmts == whilehead_st || tmp->draw.stmts == ifhead_st)
+					{	
+						tmp = setGreen(tmp);
+				
+						struct list *color;
+						int n = 1;
+						for(color = tmp->next; n > 0; color = color->next)
+						{
+							if(color->draw.stmts == whilehead_st || color->draw.stmts == ifhead_st) n++;
+							if(color->draw.stmts == whiletail_st || color->draw.stmts == iftail_st) n--;
+						
+							color = setGreen(color);
 						}
 					} else
 					{
-						struct list *del;
-						for(del = list; del->next != save; del = del->next);
-						del = deleteNext(del);
-						
-						tmp = insertNext(tmp, save->draw.stmts, unifont);
+						tmp = setGreen(tmp);
 					}
-					
-					struct list *color;
-					for(color = list; color->next != NULL; )
+					movEnable = 1;
+				} else if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && collideInstRelease(msPos, tmpInst) && movEnable == 1)
+				{
+					int unable = 0;
+					if(save->draw.stmts == whilehead_st || save->draw.stmts == ifhead_st)
 					{
-						if(color->next->draw.clr.r == 0   &&
-						   color->next->draw.clr.g == 228 &&
-						   color->next->draw.clr.b == 48  &&
-						   color->next->draw.clr.a == 255)
+						struct list *test;
+						int i = 0;
+						for(test = save; i<blockLength; i++)
 						{
-							color = deleteNext(color);
-						} else
-						{
-							color = color->next;
+							if(test == tmp) unable = 1;
+							test = test->next;
 						}
 					}
+					
+					if(tmp->next != save && tmp->next != save->next && unable == 0)
+					{
+						if(save->draw.stmts == whilehead_st || save->draw.stmts == ifhead_st)
+						{
+							struct list *insert;
+							for(insert = list; insert->next != save; insert = insert->next);
+							
+							int i;
+							for(i = 0; i < blockLength; i++)
+							{
+								optVar[0] = NULL;
+								optVar[1] = NULL;
+								optCond = NULL;
+								optDir = NULL;
+								
+								int varNum = 0;
+								struct inst_gr *tmpInst;
+								for(tmpInst = insert->next->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
+								{
+									if(tmpInst->type == var_gr)
+									{
+										optVar[varNum] = tmpInst->text;
+										varNum++;
+									}
+									
+									if(tmpInst->type == cond_gr) optCond = tmpInst->text;
+									if(tmpInst->type == dir_gr) optDir = tmpInst->text;
+								}
+								
+								tmp = insertNext(tmp, insert->next->draw.stmts, unifont, optVar[0], optVar[1], optCond, optDir);
+								tmp = tmp->next;
+								insert = insert->next;
+							}
+						} else
+						{
+							struct list *del;
+							for(del = list; del->next != save; del = del->next);
+							del = deleteNext(del);
+							
+							optVar[0] = NULL;
+							optVar[1] = NULL;
+							optCond = NULL;
+							optDir = NULL;
+							
+							int varNum = 0;
+							struct inst_gr *tmpInst;
+							for(tmpInst = save->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
+							{
+								if(tmpInst->type == var_gr)
+								{
+									optVar[varNum] = tmpInst->text;
+									varNum++;
+								}
+								
+								if(tmpInst->type == cond_gr) optCond = tmpInst->text;
+								if(tmpInst->type == dir_gr) optDir = tmpInst->text;
+							}
+							
+							tmp = insertNext(tmp, save->draw.stmts, unifont, optVar[0], optVar[1], optCond, optDir);
+						}
+						
+						struct list *color;
+						for(color = list; color->next != NULL; )
+						{
+							if(color->next->draw.inst->clr.r == 0   &&
+							   color->next->draw.inst->clr.g == 228 &&
+							   color->next->draw.inst->clr.b == 48  &&
+							   color->next->draw.inst->clr.a == 255)
+							{
+								color = deleteNext(color);
+							} else
+							{
+								color = color->next;
+							}
+						}
+					}
+					
+					tmp = setBack(tmp);
+					
+					movEnable = 0;
+					
+					list = setOffset(list);
+				}
+			}
+		}
+		
+		/* don't touch above code */
+		
+		/* dragging variables, conditionals, and directions */
+		for(tmp = list; tmp != NULL; tmp = tmp->next)
+		{
+			struct inst_gr *tmpInst;
+			for(tmpInst = tmp->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
+			{
+				if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmpInst->rec) && tmpInst->type == var_gr && varEnable == 1)
+				{
+					char *tempStr = calloc(strlen(variables[saveVar].str)+3, 0);
+					strcat(tempStr, " ");
+					strcat(tempStr, variables[saveVar].str);
+					strcat(tempStr, " ");
+					
+					tmpInst = changeInst(tmpInst, tempStr, unifont);
+					tmpInst = setOffsetX(tmpInst, tmpInst->rec.x, tmpInst->rec.y);
 				}
 				
-				movEnable = 0;
+				if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmpInst->rec) && tmpInst->type == cond_gr && condEnable == 1)
+				{
+					char *tempStr = calloc(strlen(conditionals[saveCond].str)+3, 0);
+					strcat(tempStr, " ");
+					strcat(tempStr, conditionals[saveCond].str);
+					strcat(tempStr, " ");
+					
+					tmpInst = changeInst(tmpInst, tempStr, unifont);
+					tmpInst = setOffsetX(tmpInst, tmpInst->rec.x, tmpInst->rec.y);
+				}
 				
-				list = setOffset(list);
+				if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmpInst->rec) && tmpInst->type == dir_gr && dirEnable == 1)
+				{
+					char *tempStr = calloc(strlen(directions[saveDir].str)+3, 0);
+					strcat(tempStr, " ");
+					strcat(tempStr, directions[saveDir].str);
+					strcat(tempStr, " ");
+					
+					tmpInst = changeInst(tmpInst, tempStr, unifont);
+					tmpInst = setOffsetX(tmpInst, tmpInst->rec.x, tmpInst->rec.y);
+				}
 			}
 		}
 		
 		if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
 		{
-			movEnable = 0;
 			btnEnable = 0;
+			movEnable = 0;
+			varEnable = 0;
+			condEnable = 0;
+			dirEnable = 0;
 		}
 		
 		if(movEnable == 1)
@@ -680,16 +1034,22 @@ int main(void)
 		} else
 		{
 			struct list *color;
-			for(color = list->next; color != NULL; color = color->next)
-			{
-				color->draw.clr = BLUE;
-				color->draw.strClr = RAYWHITE;
-			}
+			for(color = list->next; color != NULL; color = color->next) color = setBack(color);
 		}
 		
-		/**********************************
-		* dragging code above, do not touch
-		**********************************/
+		/* instruction stuff above */
+		
+		Rectangle startBtnRec = {400, 200, 50, 50};
+		DrawRectangleRec(startBtnRec, startBtnClr);
+		
+		if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, startBtnRec) && ColorIsEqual(startBtnClr, GREEN))
+		{
+			startBtnClr = RED;
+			code = transcribe(list);
+		} else if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, startBtnRec) && ColorIsEqual(startBtnClr, RED))
+		{
+			startBtnClr = GREEN;
+		}
 		
 		ClearBackground(RAYWHITE);
 		EndDrawing();
