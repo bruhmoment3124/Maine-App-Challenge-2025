@@ -29,12 +29,7 @@ struct token getNextToken(char **str)
     for(str; ; (*str)++)
     {
         switch(state)
-        {
-            /* error state */
-            case -1:
-                exit(-1);
-            break;
-            
+        {          
             case 0:
                 state = -1;
                 if(isspace(**str) && **str != '\n') state = 0;
@@ -76,8 +71,12 @@ struct token getNextToken(char **str)
         }
         
         /* error message */
-        if(state == -1) printf("Error: expected character: %c\n", **str);
-        
+        if(state == -1)
+		{
+			printf("ERROR: expected character: %c\n", **str);
+			break;
+		}
+		
         /* store token value */
         if((!isspace(**str) || **str == '\n') && **str != '\0')
         {
@@ -92,26 +91,34 @@ struct token getNextToken(char **str)
     }
 }
 
-void expectVal(char **str, struct token *tk, char *test)
+void expectVal(char **str, struct token *tk, char *test, int *halt)
 {
-    if(strcmp(tk->val, test) != 0)
-    {
-        printf("ERROR: expected token value: %s\n", test);
-        exit(-1);
-    }
-    
-    *tk = getNextToken(str);
+	if(*halt != 1)
+	{
+		if(strcmp(tk->val, test) != 0)
+		{
+			printf("ERROR: expected token value: %s\n", test);
+			*halt = 1;
+			return;
+		}
+		
+		if(tk->name != EOI) *tk = getNextToken(str);
+	}
 }
 
-void expectName(char **str, struct token *tk, enum name test)
+void expectName(char **str, struct token *tk, enum name test, int *halt)
 {
-    if(tk->name != test)
-    {
-        printf("ERROR: expected token name: %d\n", test);
-        exit(-1);
-    }
-    
-    if(tk->name != EOI) *tk = getNextToken(str);
+	if(*halt != 1)
+	{
+		if(tk->name != test)
+		{
+			printf("ERROR: expected token name: %d\n", test);
+			*halt = 1;
+			return;
+		}
+		
+		if(tk->name != EOI) *tk = getNextToken(str);
+	}
 }
 
 /* parsing */
@@ -134,80 +141,95 @@ struct stack
     int top;
 };
 
-struct table * createEntry(struct table *tb, char *str, int val)
+struct table * createEntry(struct table *tb, char *str, int val, int *halt)
 {
-    int i;
-    for(i = 0; i<tb->size; i++)
-    {
-        if(strcmp(tb->entry[i].id, str) == 0)
-        {
-            printf("ERROR: redeclaration of %s\n", tb->entry[i].id);
-            exit(-1);
-        }
-    }
+	if(*halt != 1)
+	{
+		int i;
+		for(i = 0; i<tb->size; i++)
+		{
+			if(strcmp(tb->entry[i].id, str) == 0)
+			{
+				printf("ERROR: redeclaration of %s\n", tb->entry[i].id);
+				*halt = 1;
+				return;
+			}
+		}
 
-    tb->size++;
-    tb->entry = realloc(tb->entry, tb->size * sizeof(struct entry));
-    tb->entry[tb->size-1].id = str;
-    tb->entry[tb->size-1].val = val;
+		tb->size++;
+		tb->entry = realloc(tb->entry, tb->size * sizeof(struct entry));
+		tb->entry[tb->size-1].id = str;
+		tb->entry[tb->size-1].val = val;
 
-    return tb;
+		return tb;
+	}
 }
 
 /* push a pointer to a table to the stack */
-struct stack pushTablePtr(struct stack st)
+struct stack pushTablePtr(struct stack st, int *halt)
 {
-    st.top++;
-    st.tb = realloc(st.tb, (st.top+1) * sizeof(struct table *));
-    st.tb[st.top] = malloc(sizeof(struct table));
+	if(*halt != 1)
+	{
+		st.top++;
+		st.tb = realloc(st.tb, (st.top+1) * sizeof(struct table *));
+		st.tb[st.top] = malloc(sizeof(struct table));
 
-    st.tb[st.top]->entry = NULL;
-    st.tb[st.top]->size = 0;
+		st.tb[st.top]->entry = NULL;
+		st.tb[st.top]->size = 0;
 
-    return st;
+		return st;
+	}
 }
 
 /* pop a pointer to a table from the stack */
-struct stack popTablePtr(struct stack st, struct table ***saveTb, int *saveTableSize)
+struct stack popTablePtr(struct stack st, struct table ***saveTb, int *saveTableSize, int *halt)
 {
-    *saveTb = realloc(*saveTb, (*saveTableSize)+1 * sizeof(struct table *));
-    (*saveTb)[*saveTableSize] = st.tb[st.top];
-    (*saveTableSize)++;
-    
-    if(st.top == 0)
-    {
-        st.top--;
-        st.tb = NULL;
-        return st;
-    } else if(st.top == -1)
-    {
-        printf("ERROR: cannot pop; nothing on the stack\n");
-        exit(-1);
-    }
+	if(*halt != 1)
+	{
+		*saveTb = realloc(*saveTb, (*saveTableSize)+1 * sizeof(struct table *));
+		(*saveTb)[*saveTableSize] = st.tb[st.top];
+		(*saveTableSize)++;
+		
+		if(st.top == 0)
+		{
+			st.top--;
+			st.tb = NULL;
+			return st;
+		} else if(st.top == -1)
+		{
+			printf("ERROR: cannot pop; nothing on the stack\n");
+			*halt = 1;
+			return;
+		}
 
-    st.top--;
-    st.tb = realloc(st.tb, (st.top+1) * sizeof(struct table *));
+		st.top--;
+		st.tb = realloc(st.tb, (st.top+1) * sizeof(struct table *));
 
-    return st;
+		return st;
+	}
 }
 
-struct entry * search(struct stack st, char *test)
+struct entry * search(struct stack st, char *test, int *halt)
 {
-    int i;
-    for(i = st.top; i>=0; i--)
-    {
-        int j;
-        for(j = st.tb[i]->size-1; j>=0; j--)
-        {
-            if(strcmp(st.tb[i]->entry[j].id, test) == 0)
-            {
-                return &(st.tb[i]->entry[j]);
-            }
-        }
-    }
-    
-    printf("ERROR: \"%s\" has not been defined\n", test);
-    exit(-1);
+	if(*halt != 1)
+	{
+		int i;
+		for(i = st.top; i>=0; i--)
+		{
+			int j;
+			for(j = st.tb[i]->size-1; j>=0; j--)
+			{
+				if(strcmp(st.tb[i]->entry[j].id, test) == 0)
+				{
+					return &(st.tb[i]->entry[j]);
+				}
+			}
+		}
+		
+		printf("ERROR: \"%s\" has not been defined\n", test);
+		*halt = 1;
+		return;
+	}
 }
 
 /* instruction functions */
@@ -235,18 +257,21 @@ struct inst
     int *arg3;
 };
 
-struct inst * emitInst(struct inst *instList, int *size, enum instType type, int *arg1, int *arg2, int *arg3)
+struct inst * emitInst(struct inst *instList, int *size, enum instType type, int *arg1, int *arg2, int *arg3, int *halt)
 {
-    instList = realloc(instList, (*size+1) * sizeof(struct inst));
-    
-    instList[*size].type = type;
-    instList[*size].arg1 = arg1;
-    instList[*size].arg2 = arg2;
-    instList[*size].arg3 = arg3;
-    
-    (*size)++;
-    
-    return instList;
+	if(*halt != 1)
+	{
+		instList = realloc(instList, (*size+1) * sizeof(struct inst));
+		
+		instList[*size].type = type;
+		instList[*size].arg1 = arg1;
+		instList[*size].arg2 = arg2;
+		instList[*size].arg3 = arg3;
+		
+		(*size)++;
+		
+		return instList;
+	}
 }
 
 /*
@@ -281,441 +306,506 @@ enum instType cond();
 void newlines();
 
 /* block -> statement newlines block | e */
-void block(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+void block(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    if(strcmp(tk->val, "add") == 0      ||
-       strcmp(tk->val, "subtract") == 0 ||
-       strcmp(tk->val, "multiply") == 0 ||
-       strcmp(tk->val, "move") == 0     ||
-       strcmp(tk->val, "turn") == 0     ||
-	   strcmp(tk->val, "set") == 0      ||
-       strcmp(tk->val, "let") == 0      ||
-       strcmp(tk->val, "if") == 0       ||
-       strcmp(tk->val, "while") == 0)
-    {
-        statement(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-        newlines(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-        block(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    }
+	if(*halt != 1)
+	{
+		if(strcmp(tk->val, "add") == 0      ||
+		   strcmp(tk->val, "subtract") == 0 ||
+		   strcmp(tk->val, "multiply") == 0 ||
+		   strcmp(tk->val, "move") == 0     ||
+		   strcmp(tk->val, "turn") == 0     ||
+		   strcmp(tk->val, "set") == 0      ||
+		   strcmp(tk->val, "let") == 0      ||
+		   strcmp(tk->val, "if") == 0       ||
+		   strcmp(tk->val, "while") == 0)
+		{
+			statement(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+			newlines(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+			block(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		}
+	}
 }
 
 /* statement -> op | if | while */
-void statement(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+void statement(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    if(strcmp(tk->val, "add") == 0      ||
-       strcmp(tk->val, "subtract") == 0 ||
-       strcmp(tk->val, "multiply") == 0 ||
-       strcmp(tk->val, "move") == 0     ||
-       strcmp(tk->val, "turn") == 0     ||
-       strcmp(tk->val, "set") == 0      ||
-       strcmp(tk->val, "let") == 0)
-    {
-        oper(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    } else if(strcmp(tk->val, "if") == 0)
-    {
-        ifst(str, tk, st, saveTb, saveTableSize, instList, instListSize, label); /* if statement */
-    } else if(strcmp(tk->val, "while") == 0)
-    {
-        whilest(str, tk, st, saveTb, saveTableSize, instList, instListSize, label); /* while statement */
-    } else
-    {
-        printf("ERROR: \"%s\" is not a valid beginning of a statement\n", tk->val);
-        exit(-1);
-    }
+	if(*halt != 1)
+	{
+		if(strcmp(tk->val, "add") == 0      ||
+		   strcmp(tk->val, "subtract") == 0 ||
+		   strcmp(tk->val, "multiply") == 0 ||
+		   strcmp(tk->val, "move") == 0     ||
+		   strcmp(tk->val, "turn") == 0     ||
+		   strcmp(tk->val, "set") == 0      ||
+		   strcmp(tk->val, "let") == 0)
+		{
+			oper(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		} else if(strcmp(tk->val, "if") == 0)
+		{
+			ifst(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt); /* if statement */
+		} else if(strcmp(tk->val, "while") == 0)
+		{
+			whilest(str, tk, st, saveTb, saveTableSize, instList, instListSize, label); /* while statement */
+		} else
+		{
+			printf("ERROR: \"%s\" is not a valid beginning of a statement\n", tk->val);
+			*halt = 1;
+			return;
+		}
+	}
 }
 
 /* oper -> add | sub | mult | move | turn | set */
-void oper(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+void oper(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    if(strcmp(tk->val, "add") == 0)
-    {
-        add(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    } else if(strcmp(tk->val, "subtract") == 0)
-    {
-        sub(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    } else if(strcmp(tk->val, "multiply") == 0)
-    {
-        mult(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    } else if(strcmp(tk->val, "move") == 0)
-    {
-        move(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    } else if(strcmp(tk->val, "turn") == 0)
-    {
-        turn(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    } else if(strcmp(tk->val, "set") == 0)
-    {
-        set(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    } else if(strcmp(tk->val, "let") == 0)
-    {
-        let(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    } else
-    {
-        printf("ERROR: malformed operation\n");
-        exit(-1);
-    }
+	if(*halt != 1)
+	{
+		if(strcmp(tk->val, "add") == 0)
+		{
+			add(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		} else if(strcmp(tk->val, "subtract") == 0)
+		{
+			sub(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		} else if(strcmp(tk->val, "multiply") == 0)
+		{
+			mult(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		} else if(strcmp(tk->val, "move") == 0)
+		{
+			move(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		} else if(strcmp(tk->val, "turn") == 0)
+		{
+			turn(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		} else if(strcmp(tk->val, "set") == 0)
+		{
+			set(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		} else if(strcmp(tk->val, "let") == 0)
+		{
+			let(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		} else
+		{
+			printf("ERROR: malformed operation\n");
+			*halt = 1;
+			return;
+		}
+	}
 }
 
 /* add -> "add" (id | num) "to" id */
-void add(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+void add(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    expectVal(str, tk, "add");
-    
-    int *firstArg = malloc(sizeof(int));
-    if(tk->name == id)
-    {   
-        struct entry *tempEntry = search(*st, tk->val);
-        expectName(str, tk, tk->name);
-        free(firstArg);
-		firstArg = &(tempEntry->val);
-    } else if(tk->name == num)
-    {
-        *firstArg = atoi(tk->val);
-        expectName(str, tk, tk->name);
-    } else
-    {
-        printf("ERROR: expected id or num\n");
-        exit(-1);
-    }
-    
-    expectVal(str, tk, "to");
-    struct entry *secondArg = search(*st, tk->val);
-    *instList = emitInst(*instList, instListSize, op_add, firstArg, &(secondArg->val), NULL);
-    expectName(str, tk, id);
+	if(*halt != 1)
+	{
+		expectVal(str, tk, "add", halt);
+		
+		int *firstArg = malloc(sizeof(int));
+		if(tk->name == id)
+		{   
+			struct entry *tempEntry = search(*st, tk->val, halt);
+			expectName(str, tk, tk->name, halt);
+			free(firstArg);
+			firstArg = &(tempEntry->val);
+		} else if(tk->name == num)
+		{
+			*firstArg = atoi(tk->val);
+			expectName(str, tk, tk->name, halt);
+		} else
+		{
+			printf("ERROR: expected id or num\n");
+			*halt = 1;
+			return;
+		}
+		
+		expectVal(str, tk, "to", halt);
+		struct entry *secondArg = search(*st, tk->val, halt);
+		*instList = emitInst(*instList, instListSize, op_add, firstArg, &(secondArg->val), NULL, halt);
+		expectName(str, tk, id, halt);
+	}
 }
 
 /* sub -> "subtract" (id | num) "from" id */
-void sub(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+void sub(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    expectVal(str, tk, "subtract");
-    
-    int *firstArg = malloc(sizeof(int));
-    if(tk->name == id)
-    {   
-        struct entry *tempEntry = search(*st, tk->val);
-        expectName(str, tk, tk->name);
-		free(firstArg);
-        firstArg = &(tempEntry->val);
-    } else if(tk->name == num)
-    {
-        *firstArg = atoi(tk->val); /* constant value temporary */
-        expectName(str, tk, tk->name);
-    } else
-    {
-        printf("ERROR: expected id or num\n");
-        exit(-1);
-    }
-    
-    expectVal(str, tk, "from");
-    struct entry *secondArg = search(*st, tk->val);
-    *instList = emitInst(*instList, instListSize, op_subtract, firstArg, &(secondArg->val), NULL);
-    expectName(str, tk, id);
+	if(*halt != 1)
+	{
+		expectVal(str, tk, "subtract", halt);
+		
+		int *firstArg = malloc(sizeof(int));
+		if(tk->name == id)
+		{   
+			struct entry *tempEntry = search(*st, tk->val, halt);
+			expectName(str, tk, tk->name, halt);
+			free(firstArg);
+			firstArg = &(tempEntry->val);
+		} else if(tk->name == num)
+		{
+			*firstArg = atoi(tk->val); /* constant value temporary */
+			expectName(str, tk, tk->name, halt);
+		} else
+		{
+			printf("ERROR: expected id or num\n");
+			*halt = 1;
+			return;
+		}
+		
+		expectVal(str, tk, "from", halt);
+		struct entry *secondArg = search(*st, tk->val, halt);
+		*instList = emitInst(*instList, instListSize, op_subtract, firstArg, &(secondArg->val), NULL, halt);
+		expectName(str, tk, id, halt);
+	}
 }
 
 /* mult -> "multiply" id "by" (id | num) */
-void mult(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+void mult(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    expectVal(str, tk, "multiply");
-    
-    struct entry *firstArg = search(*st, tk->val);
-    expectName(str, tk, id);
-    
-    expectVal(str, tk, "by");
-    
-    if(tk->name == id)
-    {   
-        struct entry *secondArg = search(*st, tk->val);
-        *instList = emitInst(*instList, instListSize, op_mult, &(firstArg->val), &(secondArg->val), NULL);
-        expectName(str, tk, tk->name);
-    } else if(tk->name == num)
-    {
-        int *c = malloc(sizeof(int)); /* constant value temporary */
-        *c = atoi(tk->val);
-        *instList = emitInst(*instList, instListSize, op_mult, &(firstArg->val), c, NULL);
-        expectName(str, tk, tk->name);
-    } else
-    {
-        printf("ERROR: expected id or num\n");
-        exit(-1);
-    }
+	if(*halt != 1)
+	{
+		expectVal(str, tk, "multiply", halt);
+		
+		struct entry *firstArg = search(*st, tk->val, halt);
+		expectName(str, tk, id, halt);
+		
+		expectVal(str, tk, "by", halt);
+		
+		if(tk->name == id)
+		{   
+			struct entry *secondArg = search(*st, tk->val, halt);
+			*instList = emitInst(*instList, instListSize, op_mult, &(firstArg->val), &(secondArg->val), NULL, halt);
+			expectName(str, tk, tk->name, halt);
+		} else if(tk->name == num)
+		{
+			int *c = malloc(sizeof(int)); /* constant value temporary */
+			*c = atoi(tk->val);
+			*instList = emitInst(*instList, instListSize, op_mult, &(firstArg->val), c, NULL, halt);
+			expectName(str, tk, tk->name, halt);
+		} else
+		{
+			printf("ERROR: expected id or num\n");
+			*halt = 1;
+			return;
+		}
+	}
 }
 
 /* move -> "move" "turtle" ("forward" | "backward") (id | num) "px" */
-void move(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+void move(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    expectVal(str, tk, "move");
-    expectVal(str, tk, "turtle");
-    
-    int *dir = malloc(sizeof(int));
-    if(strcmp(tk->val, "forward") == 0)
-    {
-        *dir = 1;
-        expectVal(str, tk, tk->val);
-    } else if(strcmp(tk->val, "backward") == 0)
-    {
-        *dir = -1;
-        expectVal(str, tk, tk->val);
-    } else
-    {
-        printf("ERROR: expected different direction\n");
-        exit(-1);
-    }
-    
-    if(tk->name == id)
-    {
-        struct entry *arg = search(*st, tk->val);
-        *instList = emitInst(*instList, instListSize, op_move, &(arg->val), dir, NULL);
-        expectName(str, tk, tk->name);
-    } else if(tk->name == num)
-    {
-        int *c = malloc(sizeof(int)); /* constant value temporary */
-        *c = atoi(tk->val);
-        *instList = emitInst(*instList, instListSize, op_move, c, dir, NULL);
-        expectName(str, tk, tk->name);
-    } else
-    {
-        printf("ERROR: expected id or num\n");
-        exit(-1);
-    }
-    
-    expectVal(str, tk, "px");
+	if(*halt != 1)
+	{
+		expectVal(str, tk, "move", halt);
+		expectVal(str, tk, "turtle", halt);
+		
+		int *dir = malloc(sizeof(int));
+		if(strcmp(tk->val, "forward") == 0)
+		{
+			*dir = 1;
+			expectVal(str, tk, tk->val, halt);
+		} else if(strcmp(tk->val, "backward") == 0)
+		{
+			*dir = -1;
+			expectVal(str, tk, tk->val, halt);
+		} else
+		{
+			printf("ERROR: expected different direction\n");
+			*halt = 1;
+			return;
+		}
+		
+		if(tk->name == id)
+		{
+			struct entry *arg = search(*st, tk->val, halt);
+			*instList = emitInst(*instList, instListSize, op_move, &(arg->val), dir, NULL, halt);
+			expectName(str, tk, tk->name, halt);
+		} else if(tk->name == num)
+		{
+			int *c = malloc(sizeof(int)); /* constant value temporary */
+			*c = atoi(tk->val);
+			*instList = emitInst(*instList, instListSize, op_move, c, dir, NULL, halt);
+			expectName(str, tk, tk->name, halt);
+		} else
+		{
+			printf("ERROR: expected id or num\n");
+			*halt = 1;
+			return;
+		}
+		
+		expectVal(str, tk, "px", halt);
+	}
 }
 
 /* turn -> "turn" "turtle" ("left" | "right") (id | num) "degrees" */
-void turn(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+void turn(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    expectVal(str, tk, "turn");
-    expectVal(str, tk, "turtle");
-    
-    if(strcmp(tk->val, "left") == 0)
-    {
-        expectVal(str, tk, tk->val);
-    } else if(strcmp(tk->val, "right") == 0)
-    {
-        expectVal(str, tk, tk->val);
-    } else
-    {
-        printf("ERROR: expected different direction\n");
-        exit(-1);
-    }
-    
-    if(tk->name == id)
-    {
-        struct entry *arg = search(*st, tk->val);
-        expectName(str, tk, tk->name);
-    } else if(tk->name == num)
-    {
-        expectName(str, tk, tk->name);
-    } else
-    {
-        printf("ERROR: expected id or num\n");
-        exit(-1);
-    }
-    
-    expectVal(str, tk, "degrees");
+	if(*halt != 1)
+	{
+		expectVal(str, tk, "turn", halt);
+		expectVal(str, tk, "turtle", halt);
+		
+		if(strcmp(tk->val, "left") == 0)
+		{
+			expectVal(str, tk, tk->val, halt);
+		} else if(strcmp(tk->val, "right") == 0)
+		{
+			expectVal(str, tk, tk->val, halt);
+		} else
+		{
+			printf("ERROR: expected different direction\n");
+			*halt = 1;
+			return;
+		}
+		
+		if(tk->name == id)
+		{
+			struct entry *arg = search(*st, tk->val, halt);
+			expectName(str, tk, tk->name, halt);
+		} else if(tk->name == num)
+		{
+			expectName(str, tk, tk->name, halt);
+		} else
+		{
+			printf("ERROR: expected id or num\n");
+			*halt = 1;
+			return;
+		}
+		
+		expectVal(str, tk, "degrees", halt);
+	}
 }
 
 /* set -> "set" id "equal" "to" (id | num) */
-void set(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+void set(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    expectVal(str, tk, "set");
-	
-    struct entry *firstArg = search(*st, tk->val);
-	expectName(str, tk, id);
-	
-	expectVal(str, tk, "equal");
-	expectVal(str, tk, "to");
-    
-    if(tk->name == id)
-    {   
-        struct entry *secondArg = search(*st, tk->val);
-        expectName(str, tk, tk->name);
-        *instList = emitInst(*instList, instListSize, op_set, &(firstArg->val), &(secondArg->val), NULL);
-    } else if(tk->name == num)
-    {
-        int *c = malloc(sizeof(int)); /* constant value temporary */
-        *c = atoi(tk->val);
-		*instList = emitInst(*instList, instListSize, op_set, &(firstArg->val), c, NULL);
-        expectName(str, tk, tk->name);
-    } else
-    {
-        printf("ERROR: expected id or num\n");
-        exit(-1);
-    }
+	if(*halt != 1)
+	{
+		expectVal(str, tk, "set", halt);
+		
+		struct entry *firstArg = search(*st, tk->val, halt);
+		expectName(str, tk, id, halt);
+		
+		expectVal(str, tk, "equal", halt);
+		expectVal(str, tk, "to", halt);
+		
+		if(tk->name == id)
+		{   
+			struct entry *secondArg = search(*st, tk->val, halt);
+			expectName(str, tk, tk->name, halt);
+			*instList = emitInst(*instList, instListSize, op_set, &(firstArg->val), &(secondArg->val), NULL, halt);
+		} else if(tk->name == num)
+		{
+			int *c = malloc(sizeof(int)); /* constant value temporary */
+			*c = atoi(tk->val);
+			*instList = emitInst(*instList, instListSize, op_set, &(firstArg->val), c, NULL, halt);
+			expectName(str, tk, tk->name, halt);
+		} else
+		{
+			printf("ERROR: expected id or num\n");
+			*halt = 1;
+			return;
+		}
+	}
 }
 
 /* let -> "let" id "equal" (id | num) */
-void let(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+void let(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    expectVal(str, tk, "let");
-	
-	char *temp = tk->val;
-	expectName(str, tk, id);
-	
-	expectVal(str, tk, "equal");
-    
-    if(tk->name == id)
-    {
-        struct entry *tempEntry = search(*st, tk->val);
-        st->tb[st->top] = createEntry(st->tb[st->top], temp, tempEntry->val);
-        expectName(str, tk, tk->name);
-    } else if(tk->name == num)
-    {
-        st->tb[st->top] = createEntry(st->tb[st->top], temp, atoi(tk->val)); /* !!! ADD: definitely check size before hand so there is no overflow !!! */
-        expectName(str, tk, tk->name);
-    } else
-    {
-        printf("ERROR: expected id or num\n");
-        exit(-1);
-    }
+	if(*halt != 1)
+	{
+		expectVal(str, tk, "let", halt);
+		
+		char *temp = tk->val;
+		expectName(str, tk, id, halt);
+		
+		expectVal(str, tk, "equal", halt);
+		
+		if(tk->name == id)
+		{
+			struct entry *tempEntry = search(*st, tk->val, halt);
+			st->tb[st->top] = createEntry(st->tb[st->top], temp, tempEntry->val, halt);
+			expectName(str, tk, tk->name, halt);
+		} else if(tk->name == num)
+		{
+			st->tb[st->top] = createEntry(st->tb[st->top], temp, atoi(tk->val), halt); /* !!! ADD: definitely check size before hand so there is no overflow !!! */
+			expectName(str, tk, tk->name, halt);
+		} else
+		{
+			printf("ERROR: expected id or num\n");
+			*halt = 1;
+			return;
+		}
+	}
 }
 
 /* ifst -> "if" id cond (id | num) "then" newlines block "end" "if" */
-void ifst(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+void ifst(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    expectVal(str, tk, "if");
-    
-    struct entry *firstArg = search(*st, tk->val);
-    expectName(str, tk, id);
-    
-    enum instType cnd = cond(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    int *tempLabel = malloc(sizeof(int));
-	*tempLabel = *label;
-    (*label)++;
-    
-    if(tk->name == id)
-    {   
-        struct entry *secondArg = search(*st, tk->val);
-        expectName(str, tk, tk->name);
-        *instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), &(secondArg->val), tempLabel);
-    } else if(tk->name == num)
-    {
-        int *c = malloc(sizeof(int)); /* constant value temporary */
-        *c = atoi(tk->val);
-        *instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), c, tempLabel);
-        expectName(str, tk, tk->name);
-    } else
-    {
-        printf("ERROR: expected id or num\n");
-        exit(-1);
-    }
-    
-    expectVal(str, tk, "then");
-    
-    *st = pushTablePtr(*st);
-    
-    newlines(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    block(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    expectVal(str, tk, "end");
-	expectVal(str, tk, "if");
-    
-    *instList= emitInst(*instList, instListSize, t_label, tempLabel, NULL, NULL);
-    
-    *st = popTablePtr(*st, saveTb, saveTableSize);
+	if(*halt != 1)
+	{
+		expectVal(str, tk, "if", halt);
+		
+		struct entry *firstArg = search(*st, tk->val, halt);
+		expectName(str, tk, id, halt);
+		
+		enum instType cnd = cond(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		int *tempLabel = malloc(sizeof(int));
+		*tempLabel = *label;
+		(*label)++;
+		
+		if(tk->name == id)
+		{   
+			struct entry *secondArg = search(*st, tk->val, halt);
+			expectName(str, tk, tk->name, halt);
+			*instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), &(secondArg->val), tempLabel, halt);
+		} else if(tk->name == num)
+		{
+			int *c = malloc(sizeof(int)); /* constant value temporary */
+			*c = atoi(tk->val);
+			*instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), c, tempLabel, halt);
+			expectName(str, tk, tk->name, halt);
+		} else
+		{
+			printf("ERROR: expected id or num\n");
+			*halt = 1;
+			return;
+		}
+		
+		expectVal(str, tk, "then", halt);
+		
+		*st = pushTablePtr(*st, halt);
+		
+		newlines(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		block(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		expectVal(str, tk, "end", halt);
+		expectVal(str, tk, "if", halt);
+		
+		*instList= emitInst(*instList, instListSize, t_label, tempLabel, NULL, NULL, halt);
+		
+		*st = popTablePtr(*st, saveTb, saveTableSize, halt);
+	}
 }
 
 /* whilest -> "while" id cond (id | num) "do" newlines block "end" "while" */
-void whilest(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+void whilest(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    expectVal(str, tk, "while");
-    
-    struct entry *firstArg = search(*st, tk->val);
-    expectName(str, tk, id);
-    
-    enum instType cnd = cond(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    
-	int *firstTempLabel = malloc(sizeof(int));
-	*firstTempLabel = *label;
-	(*label)++;
-	
-    int *secondTempLabel = malloc(sizeof(int));
-	*firstTempLabel = *label;
-    (*label)++;
-    
-    if(tk->name == id)
-    {   
-        struct entry *secondArg = search(*st, tk->val);
-        expectName(str, tk, tk->name);
-        *instList = emitInst(*instList, instListSize, t_label, firstTempLabel, NULL, NULL);
-        *instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), &(secondArg->val), secondTempLabel);
-    } else if(tk->name == num)
-    {
-        int *c = malloc(sizeof(int)); /* constant value temporary */
-        *c = atoi(tk->val);
-		*instList = emitInst(*instList, instListSize, t_label, firstTempLabel, NULL, NULL);
-        *instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), c, secondTempLabel);
-        expectName(str, tk, tk->name);
-    } else
-    {
-        printf("ERROR: expected id or num\n");
-        exit(-1);
-    }
-    
-    expectVal(str, tk, "do");
-    
-    *st = pushTablePtr(*st);
-    
-    newlines(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    block(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    expectVal(str, tk, "end");
-    expectVal(str, tk, "while");
-    
-    *instList = emitInst(*instList, instListSize, op_jmp, firstTempLabel, NULL, NULL);
-    *instList = emitInst(*instList, instListSize, t_label, secondTempLabel, NULL, NULL);
-    
-    *st = popTablePtr(*st, saveTb, saveTableSize);
+	if(*halt != 1)
+	{
+		expectVal(str, tk, "while", halt);
+		
+		struct entry *firstArg = search(*st, tk->val, halt);
+		expectName(str, tk, id, halt);
+		
+		enum instType cnd = cond(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		
+		int *firstTempLabel = malloc(sizeof(int));
+		*firstTempLabel = *label;
+		(*label)++;
+		
+		int *secondTempLabel = malloc(sizeof(int));
+		*firstTempLabel = *label;
+		(*label)++;
+		
+		if(tk->name == id)
+		{   
+			struct entry *secondArg = search(*st, tk->val, halt);
+			expectName(str, tk, tk->name, halt);
+			*instList = emitInst(*instList, instListSize, t_label, firstTempLabel, NULL, NULL, halt);
+			*instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), &(secondArg->val), secondTempLabel, halt);
+		} else if(tk->name == num)
+		{
+			int *c = malloc(sizeof(int)); /* constant value temporary */
+			*c = atoi(tk->val);
+			*instList = emitInst(*instList, instListSize, t_label, firstTempLabel, NULL, NULL, halt);
+			*instList = emitInst(*instList, instListSize, cnd, &(firstArg->val), c, secondTempLabel, halt);
+			expectName(str, tk, tk->name, halt);
+		} else
+		{
+			printf("ERROR: expected id or num\n");
+			*halt = 1;
+			return;
+		}
+		
+		expectVal(str, tk, "do", halt);
+		
+		*st = pushTablePtr(*st, halt);
+		
+		newlines(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		block(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		expectVal(str, tk, "end", halt);
+		expectVal(str, tk, "while", halt);
+		
+		*instList = emitInst(*instList, instListSize, op_jmp, firstTempLabel, NULL, NULL, halt);
+		*instList = emitInst(*instList, instListSize, t_label, secondTempLabel, NULL, NULL, halt);
+		
+		*st = popTablePtr(*st, saveTb, saveTableSize, halt);
+	}
 }
 
 /* cond -> "islessthan" | "isgreaterthan" | "isequalto" */
-enum instType cond(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+enum instType cond(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    if(strcmp(tk->val, "islessthan") == 0)
-    {
-        expectVal(str, tk, tk->val);
-		return op_jge;
-    } else if(strcmp(tk->val, "isgreaterthan") == 0)
+	if(*halt != 1)
 	{
-		expectVal(str, tk, tk->val);
-		return op_jle;
-	} else if(strcmp(tk->val, "isequalto") == 0)
-	{
-		expectVal(str, tk, tk->val);
-		return op_jne;
-	} else
-    {
-        printf("ERROR: malformed conditional\n");
-        exit(-1);
-    }
+		if(strcmp(tk->val, "islessthan") == 0)
+		{
+			expectVal(str, tk, tk->val, halt);
+			return op_jge;
+		} else if(strcmp(tk->val, "isgreaterthan") == 0)
+		{
+			expectVal(str, tk, tk->val, halt);
+			return op_jle;
+		} else if(strcmp(tk->val, "isequalto") == 0)
+		{
+			expectVal(str, tk, tk->val, halt);
+			return op_jne;
+		} else
+		{
+			printf("ERROR: malformed conditional\n");
+			*halt = 1;
+		}
+	}
 }
 
 /* newlines -> "\n" newlines | e */
-void newlines(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+void newlines(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    if(tk->name == newline)
-    {
-        expectName(str, tk, newline);
-        newlines(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    } else
-    {
-        
-    }
+	if(*halt != 1)
+	{
+		if(tk->name == newline)
+		{
+			expectName(str, tk, newline, halt);
+			newlines(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		} else
+		{
+			
+		}
+	}
 }
 
-void parse(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label)
+int parse(char **str, struct token *tk, struct stack *st, struct table ***saveTb, int *saveTableSize, struct inst **instList, int *instListSize, int *label, int *halt)
 {
-    *st = pushTablePtr(*st);
-    
-    newlines(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    block(str, tk, st, saveTb, saveTableSize, instList, instListSize, label);
-    expectName(str, tk, EOI);
-    
-    *st = popTablePtr(*st, saveTb, saveTableSize);
+	if(*halt != 1)
+	{
+		*st = pushTablePtr(*st, halt);
+		
+		newlines(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		block(str, tk, st, saveTb, saveTableSize, instList, instListSize, label, halt);
+		expectName(str, tk, EOI, halt);
+		
+		*st = popTablePtr(*st, saveTb, saveTableSize, halt);
+	}
+	
+	if(*halt == 1)
+	{
+		return 1;
+	}
+	
+	return 0;
 }
 
-void interpret(struct inst *instList, int instListSize)
+int interpret(struct inst *instList, int instListSize, int *currentInst)
 {
-    int i;
-    for(i = 0; i<instListSize; i++)
-    {
+	int i = *currentInst;
+    if(i < instListSize)
+	{
         switch(instList[i].type)
         {
             case op_add:
@@ -799,53 +889,12 @@ void interpret(struct inst *instList, int instListSize)
 				}
 			break;
         }
-    }
+    } else
+	{
+		return 1;
+	}
+	
+	*currentInst = i;
+	(*currentInst)++;
+	return 0;
 }
-
-//int main(void)
-//{
-/*    char *str = "let i equal 0 \
-				 while i islessthan 5 do \
-					move turtle forward i px \
-					add 1 to i \
-					let i equal 10 \
-					move turtle forward i px \
-				 end while";*/
-//				
-//    struct token tk = getNextToken(&str); /* get first token */
-//    
-//    /* symbol table stack init */
-//    struct stack st;
-//    st.tb = NULL;
-//    st.top = -1;
-//    
-//    /* table of saved pointers for deallocation after
-//       values are popped off the stack */
-//    struct table **saveTb = NULL;
-//    int saveTableSize = 0;
-//    
-//    struct inst *instList = NULL;
-//    int instListSize = 0;
-//    
-//    int label = 0;
-//    
-//    parse(&str, &tk, &st, &saveTb, &saveTableSize, &instList, &instListSize, &label);
-//	
-//	
-//	/*int i;
-//	for(i = 0; i<instListSize; i++)
-//	{
-//		printf("%d ", instList[i].type);
-//		if(instList[i].arg1 != NULL) printf("%d ", *(instList[i].arg1));
-//		if(instList[i].arg2 != NULL) printf("%d ", *(instList[i].arg2));
-//		if(instList[i].arg3 != NULL) printf("%d ", *(instList[i].arg3));
-//		printf("\n");
-//	}*/
-//	
-//	
-//    interpret(instList, instListSize);
-//	
-//	getchar();
-//	
-//    return 0;
-//}
