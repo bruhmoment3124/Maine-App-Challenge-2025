@@ -488,7 +488,7 @@ struct dirs * createDirections(struct dirs *directions, Font fnt)
 {
 	char *str[4] = {"forward", "backward", "left", "right"};
 	
-	int xoffset = 375, yoffset = 375;
+	int xoffset = 275, yoffset = 450;
 	
 	int i;
 	for(i = 0; i<4; i++)
@@ -645,7 +645,7 @@ int main(void)
 	struct conds *conditionals = malloc(3 * sizeof(struct conds));
 	struct dirs *directions = malloc(4 * sizeof(struct dirs));
 	
-	InitWindow(650, 600, "test");
+	InitWindow(750, 600, "test");
 	
 	SetTargetFPS(60);
 	
@@ -683,354 +683,398 @@ int main(void)
 	struct list *part = list;
 	
 	int emitSize = 0;
-	Vector2 initPos = {250, 250};
+	Vector2 initPos = {600, 150};
 	Vector2 *emit = NULL;
 	emit = emitLine(emit, initPos, &emitSize);
-	float rotation = -45.0;
+	float rotation = 0.0;
 	
 	/* interpreter setup */
-	char *code;
-	
-	struct token tk; /* get first token */
-    
-	/* symbol table stack init */
-	struct stack st;
-	st.tb = NULL;
-	st.top = -1;
-			
-	/* table of saved pointers for deallocation after
-	   values are popped off the stack */
-	struct table **saveTb = NULL;
-	int saveTableSize = 0;
 	
 	struct inst *instList;
 	int instListSize = 0;
+	
+	int state = 0;
 	
 	while(!WindowShouldClose())
 	{
 		BeginDrawing();
 		
-		/* draw instruction box */
-		DrawRectangle(50, 350, 400, 225, RED);
-		DrawRectangleLines(50, 350, 400, 225, BLACK);
-		
-		/* draw code box */
-		DrawRectangle(50, 50, 400, 260, GRAY);
-		
-		/* draw state buttons */
-		
-		/* code button */
-		Vector2 codeBtnSize = MeasureTextEx(unifont, "code", 16, 1);
-		int codeWidth = codeBtnSize.x+5;
-		int codeHeight = codeBtnSize.y+5;
-		
-		Rectangle codeBtn = {50, 10, codeWidth+100, codeHeight};
-		DrawRectangleRounded(codeBtn, 100, 1000, BLACK);
-		
-		Vector2 codeStrPos = {codeBtn.x+52, codeBtn.y+2};
-		DrawTextEx(unifont, "code", codeStrPos, 16, 1, WHITE);
-		
-		/* docs button */
-		Vector2 docsBtnSize = MeasureTextEx(unifont, "docs", 16, 1);
-		int docsWidth = docsBtnSize.x+5;
-		int docsHeight = docsBtnSize.y+5;
-		
-		Rectangle docsBtn = {250, 10, docsWidth+100, docsHeight};
-		DrawRectangleRounded(docsBtn, 100, 1000, BLACK);
-		
-		Vector2 docsStrPos = {docsBtn.x+52, docsBtn.y+2};
-		DrawTextEx(unifont, "docs", docsStrPos, 16, 1, WHITE);
-		
-		/* about button */
-		Vector2 abtBtnSize = MeasureTextEx(unifont, "about", 16, 1);
-		int abtWidth = abtBtnSize.x+5;
-		int abtHeight = abtBtnSize.y+5;
-		
-		Rectangle abtBtn = {450, 10, abtWidth+100, abtHeight};
-		DrawRectangleRounded(abtBtn, 100, 1000, BLACK);
-		
-		Vector2 abtStrPos = {abtBtn.x+52, abtBtn.y+2};
-		DrawTextEx(unifont, "about", abtStrPos, 16, 1, WHITE);
-		   
-		if(IsKeyPressed(KEY_UP) && part->next->next != NULL)
+		if(state == 0)
 		{
-			y -= 20;
-			list = setOffset(list, x, y);
-			part = part->next;
-		}   
-		
-		if(IsKeyPressed(KEY_DOWN) && part != list)
-		{
-			y += 20;
-			list = setOffset(list, x, y);
+			char *code;
+	
+			struct token tk; /* get first token */
 			
-			struct list *tmp;
-			for(tmp = list; tmp->next != part; tmp = tmp->next);
-			part = tmp;
-		}
-		
-		/* draw buttons */
-		drawVals(part, unifont);
-		drawButtons(buttons, unifont);
-		drawVariables(variables, unifont);
-		drawConditionals(conditionals, unifont);
-		drawDirections(directions, unifont);
-		
-		Vector2 msPos = GetMousePosition();
-		
-		/* check if a button is pressed */
-		int i;
-		for(i = 0; i<9; i++)
-		{
-			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, buttons[i].box))
+			/* symbol table stack init */
+			struct stack st;
+			st.tb = NULL;
+			st.top = -1;
+					
+			/* table of saved pointers for deallocation after
+			   values are popped off the stack */
+			struct table **saveTb = NULL;
+			int saveTableSize = 0;
+			
+			/* draw instruction box */
+			DrawRectangle(50, 350, 400, 225, GRAY);
+			DrawRectangleLines(50, 350, 400, 225, BLACK);
+			
+			
+			/* draw code box */
+			DrawRectangle(50, 50, 400, 260, GRAY);
+			
+			Rectangle trash = {395, 255, 50, 50};
+			DrawRectangleRec(trash, RED);
+			
+			/* draw state buttons */
+			
+			Vector2 msPos = GetMousePosition();
+			
+			/* code button */
+			Vector2 codeBtnSize = MeasureTextEx(unifont, "code", 16, 1);
+			int codeWidth = codeBtnSize.x+5;
+			int codeHeight = codeBtnSize.y+5;
+			
+			Rectangle codeBtn = {50, 10, codeWidth+100, codeHeight};
+			DrawRectangleRounded(codeBtn, 100, 1000, RED);
+			
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, codeBtn)) state = 0;
+			
+			Vector2 codeStrPos = {codeBtn.x+52, codeBtn.y+2};
+			DrawTextEx(unifont, "code", codeStrPos, 16, 1, WHITE);
+			
+			/* docs button */
+			Vector2 docsBtnSize = MeasureTextEx(unifont, "docs", 16, 1);
+			int docsWidth = docsBtnSize.x+5;
+			int docsHeight = docsBtnSize.y+5;
+			
+			Rectangle docsBtn = {250, 10, docsWidth+100, docsHeight};
+			DrawRectangleRounded(docsBtn, 100, 1000, BLACK);
+			
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, docsBtn)) state = 1;
+			
+			Vector2 docsStrPos = {docsBtn.x+52, docsBtn.y+2};
+			DrawTextEx(unifont, "docs", docsStrPos, 16, 1, WHITE);
+			
+			/* about button */
+			Vector2 abtBtnSize = MeasureTextEx(unifont, "about", 16, 1);
+			int abtWidth = abtBtnSize.x+5;
+			int abtHeight = abtBtnSize.y+5;
+			
+			Rectangle abtBtn = {450, 10, abtWidth+100, abtHeight};
+			DrawRectangleRounded(abtBtn, 100, 1000, BLACK);
+			
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, abtBtn)) state = 2;
+			
+			Vector2 abtStrPos = {abtBtn.x+52, abtBtn.y+2};
+			DrawTextEx(unifont, "about", abtStrPos, 16, 1, WHITE);
+			   
+			if(IsKeyPressed(KEY_UP) && part->next->next != NULL)
 			{
-				switch(buttons[i].type)
-				{
-					case 0: stmt = add_st; break;
-					case 1: stmt = sub_st; break;
-					case 2: stmt = mult_st; break;
-					case 3: stmt = move_st; break;
-					case 4: stmt = turn_st; break;
-					case 5: stmt = set_st; break;
-					case 6: stmt = let_st; break;
-					case 7: whilecond = 1; break;
-					case 8: ifcond = 1; break;
-				}
+				y -= 20;
+				list = setOffset(list, x, y);
+				part = part->next;
+			}   
+			
+			if(IsKeyPressed(KEY_DOWN) && part != list)
+			{
+				y += 20;
+				list = setOffset(list, x, y);
 				
-				saveInst = i;
-				btnEnable = 1;
+				struct list *tmp;
+				for(tmp = list; tmp->next != part; tmp = tmp->next);
+				part = tmp;
 			}
-		}
-		
-		/* if a variable is pressed */
-		int j;
-		for(j = 0; j<9; j++)
-		{
-			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointCircle(msPos, variables[j].pos, variables[j].rad))
+			
+			/* draw buttons */
+			drawVals(part, unifont);
+			drawButtons(buttons, unifont);
+			drawVariables(variables, unifont);
+			drawConditionals(conditionals, unifont);
+			drawDirections(directions, unifont);
+			
+			/* check if a button is pressed */
+			int i;
+			for(i = 0; i<9; i++)
 			{
-				saveVar = j;
-				varEnable = 1;
+				if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, buttons[i].box))
+				{
+					switch(buttons[i].type)
+					{
+						case 0: stmt = add_st; break;
+						case 1: stmt = sub_st; break;
+						case 2: stmt = mult_st; break;
+						case 3: stmt = move_st; break;
+						case 4: stmt = turn_st; break;
+						case 5: stmt = set_st; break;
+						case 6: stmt = let_st; break;
+						case 7: whilecond = 1; break;
+						case 8: ifcond = 1; break;
+					}
+					
+					saveInst = i;
+					btnEnable = 1;
+				}
 			}
-		}
-		
-		/* if a conditional is pressed */
-		int k;
-		for(k = 0; k<4; k++)
-		{
-			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, conditionals[k].box))
+			
+			/* if a variable is pressed */
+			int j;
+			for(j = 0; j<9; j++)
 			{
-				saveCond = k;
-				condEnable = 1;
+				if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointCircle(msPos, variables[j].pos, variables[j].rad))
+				{
+					saveVar = j;
+					varEnable = 1;
+				}
 			}
-		}
-		
-		/* if a direction is pressed */
-		int l;
-		for(l = 0; l<4; l++)
-		{
-			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, directions[l].box))
+			
+			/* if a conditional is pressed */
+			int k;
+			for(k = 0; k<4; k++)
 			{
-				saveDir = l;
-				dirEnable = 1;
+				if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, conditionals[k].box))
+				{
+					saveCond = k;
+					condEnable = 1;
+				}
 			}
-		}
-		
-		/* if a button has been pressed, enable it */
-		if(btnEnable == 1)
-		{
-			hover(msPos, part);
-		
-			Vector2 tmpSize = MeasureTextEx(unifont, buttons[saveInst].str, 16, 1);
-			int width = tmpSize.x+5;
-			int height = tmpSize.y+5;
 			
-			/* rectangle position and drawing */
-			Rectangle tempRec = {msPos.x - (int)(width/2), msPos.y - (int)(height/2), width, height};
-			DrawRectangleRec(tempRec, RED);
+			/* if a direction is pressed */
+			int l;
+			for(l = 0; l<4; l++)
+			{
+				if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, directions[l].box))
+				{
+					saveDir = l;
+					dirEnable = 1;
+				}
+			}
 			
-			/* text position and drawing */
-			Vector2 strPos = {tempRec.x+2, tempRec.y+2};
-			DrawTextEx(unifont, buttons[saveInst].str, strPos, 16, 1, WHITE);
-		}
-		
-		if(varEnable == 1)
-		{
-			DrawCircle(msPos.x, msPos.y, 8, ORANGE);
+			/* if a button has been pressed, enable it */
+			if(btnEnable == 1)
+			{
+				hover(msPos, part);
 			
-			/* text position and drawing */
-			Vector2 strPos = {msPos.x-4, msPos.y-9};
-			DrawTextEx(unifont, variables[saveVar].str, strPos, 16, 1, WHITE);
-		}
-		
-		if(condEnable == 1)
-		{
-			Vector2 tmpSize = MeasureTextEx(unifont, conditionals[saveCond].str, 16, 1);
-			int width = tmpSize.x+5;
-			int height = tmpSize.y+5;
+				Vector2 tmpSize = MeasureTextEx(unifont, buttons[saveInst].str, 16, 1);
+				int width = tmpSize.x+5;
+				int height = tmpSize.y+5;
+				
+				/* rectangle position and drawing */
+				Rectangle tempRec = {msPos.x - (int)(width/2), msPos.y - (int)(height/2), width, height};
+				DrawRectangleRec(tempRec, RED);
+				
+				/* text position and drawing */
+				Vector2 strPos = {tempRec.x+2, tempRec.y+2};
+				DrawTextEx(unifont, buttons[saveInst].str, strPos, 16, 1, WHITE);
+			}
 			
-			/* rectangle position and drawing */
-			Rectangle tempRec = {msPos.x - (int)(width/2), msPos.y - (int)(height/2), width, height};
-			DrawRectangleRec(tempRec, PURPLE);
+			if(varEnable == 1)
+			{
+				DrawCircle(msPos.x, msPos.y, 8, ORANGE);
+				
+				/* text position and drawing */
+				Vector2 strPos = {msPos.x-4, msPos.y-9};
+				DrawTextEx(unifont, variables[saveVar].str, strPos, 16, 1, WHITE);
+			}
 			
-			/* text position and drawing */
-			Vector2 strPos = {tempRec.x+2, tempRec.y+2};
-			DrawTextEx(unifont, conditionals[saveCond].str, strPos, 16, 1, WHITE);
-		}
-		
-		if(dirEnable == 1)
-		{
-			Vector2 tmpSize = MeasureTextEx(unifont, directions[saveDir].str, 16, 1);
-			int width = tmpSize.x+5;
-			int height = tmpSize.y+5;
+			if(condEnable == 1)
+			{
+				Vector2 tmpSize = MeasureTextEx(unifont, conditionals[saveCond].str, 16, 1);
+				int width = tmpSize.x+5;
+				int height = tmpSize.y+5;
+				
+				/* rectangle position and drawing */
+				Rectangle tempRec = {msPos.x - (int)(width/2), msPos.y - (int)(height/2), width, height};
+				DrawRectangleRec(tempRec, PURPLE);
+				
+				/* text position and drawing */
+				Vector2 strPos = {tempRec.x+2, tempRec.y+2};
+				DrawTextEx(unifont, conditionals[saveCond].str, strPos, 16, 1, WHITE);
+			}
 			
-			/* rectangle position and drawing */
-			Rectangle tempRec = {msPos.x - (int)(width/2), msPos.y - (int)(height/2), width, height};
-			DrawRectangleRec(tempRec, RED);
+			if(dirEnable == 1)
+			{
+				Vector2 tmpSize = MeasureTextEx(unifont, directions[saveDir].str, 16, 1);
+				int width = tmpSize.x+5;
+				int height = tmpSize.y+5;
+				
+				/* rectangle position and drawing */
+				Rectangle tempRec = {msPos.x - (int)(width/2), msPos.y - (int)(height/2), width, height};
+				DrawRectangleRec(tempRec, RED);
+				
+				/* text position and drawing */
+				Vector2 strPos = {tempRec.x+2, tempRec.y+2};
+				DrawTextEx(unifont, directions[saveDir].str, strPos, 16, 1, WHITE);
+			}
 			
-			/* text position and drawing */
-			Vector2 strPos = {tempRec.x+2, tempRec.y+2};
-			DrawTextEx(unifont, directions[saveDir].str, strPos, 16, 1, WHITE);
-		}
-		
-		char *numStr = TextFormat("%d", numVar);
-		Vector2 size = MeasureTextEx(unifont, numStr, 16, 1);
-		
-		Rectangle tempRec1 = {225, 400, size.x+5, size.y+5};
-		Vector2 strPos = {tempRec1.x+2, tempRec1.y+2};
-		
-		Rectangle tempRec2 = {225, 375, 20, 20};
-		DrawRectangleRec(tempRec2, ORANGE);
-		
-		Rectangle tempRec3 = {225, 425, 20, 20};
-		DrawRectangleRec(tempRec3, ORANGE);
-		
-		if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tempRec1)) numEnable = 1;
-		
-		if(numEnable == 1)
-		{
-			/* rectangle position and drawing */
-			Rectangle tempRec = {msPos.x - (int)(tempRec1.width/2), msPos.y - (int)(tempRec1.height/2), tempRec1.width, tempRec1.height};
-			DrawRectangleRec(tempRec, ORANGE);
+			char *numStr = TextFormat("%d", numVar);
+			Vector2 size = MeasureTextEx(unifont, numStr, 16, 1);
 			
-			/* text position and drawing */
-			Vector2 strPos = {tempRec.x+2, tempRec.y+2};
+			Rectangle tempRec1 = {225, 400, size.x+5, size.y+5};
+			Vector2 strPos = {tempRec1.x+2, tempRec1.y+2};
+			
+			Rectangle tempRec2 = {225, 375, 20, 20};
+			DrawRectangleRec(tempRec2, ORANGE);
+			
+			Rectangle tempRec3 = {225, 425, 20, 20};
+			DrawRectangleRec(tempRec3, ORANGE);
+			
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tempRec1)) numEnable = 1;
+			
+			if(numEnable == 1)
+			{
+				/* rectangle position and drawing */
+				Rectangle tempRec = {msPos.x - (int)(tempRec1.width/2), msPos.y - (int)(tempRec1.height/2), tempRec1.width, tempRec1.height};
+				DrawRectangleRec(tempRec, ORANGE);
+				
+				/* text position and drawing */
+				Vector2 strPos = {tempRec.x+2, tempRec.y+2};
+				DrawTextEx(unifont, numStr, strPos, 16, 1, WHITE);
+			}
+			
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tempRec2)) numVar++;
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tempRec3)) numVar--;
+			
+			DrawRectangleRec(tempRec1, ORANGE);
 			DrawTextEx(unifont, numStr, strPos, 16, 1, WHITE);
-		}
-		
-		if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tempRec2)) numVar++;
-		if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tempRec3)) numVar--;
-		
-		DrawRectangleRec(tempRec1, ORANGE);
-		DrawTextEx(unifont, numStr, strPos, 16, 1, WHITE);
-		
-		/*************************************************************/
-		/*-----------------------------------------------------------*/
-		/*************************************************************/
-		
-		/* check if the mouse button has been released after it has been
-		   pressed, and if it was over a collision area */
-		struct list *tmp;
-		for(tmp = list; tmp != NULL; tmp = tmp->next)
-		{
-			struct inst_gr *tmpInst;
-			for(tmpInst = tmp->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
+			
+			/*************************************************************/
+			/*-----------------------------------------------------------*/
+			/*************************************************************/
+			
+			/* check if the mouse button has been released after it has been
+			   pressed, and if it was over a collision area */
+			struct list *tmp;
+			for(tmp = list; tmp != NULL; tmp = tmp->next)
 			{
-				if((IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && collideInstRelease(msPos, tmpInst) && btnEnable == 1) ||
-				   (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, list->draw.collisionRec) && btnEnable == 1))
+				struct inst_gr *tmpInst;
+				for(tmpInst = tmp->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
 				{
-					if(whilecond == 1)
+					if((IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && collideInstRelease(msPos, tmpInst) && btnEnable == 1) ||
+					   (IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, list->draw.collisionRec) && btnEnable == 1))
 					{
-						tmp = insertNext(tmp, whiletail_st, unifont, NULL, NULL, NULL, NULL);
-						tmp = insertNext(tmp, whilehead_st, unifont, NULL, NULL, NULL, NULL);
-						whilecond = 0;
-					} else if(ifcond == 1)
-					{
-						tmp = insertNext(tmp, iftail_st, unifont, NULL, NULL, NULL, NULL);
-						tmp = insertNext(tmp, ifhead_st, unifont, NULL, NULL, NULL, NULL);
-						ifcond = 0;
-					} else
-					{
-						tmp = insertNext(tmp, stmt, unifont, NULL, NULL, NULL, NULL);
+						if(whilecond == 1)
+						{
+							tmp = insertNext(tmp, whiletail_st, unifont, NULL, NULL, NULL, NULL);
+							tmp = insertNext(tmp, whilehead_st, unifont, NULL, NULL, NULL, NULL);
+							whilecond = 0;
+						} else if(ifcond == 1)
+						{
+							tmp = insertNext(tmp, iftail_st, unifont, NULL, NULL, NULL, NULL);
+							tmp = insertNext(tmp, ifhead_st, unifont, NULL, NULL, NULL, NULL);
+							ifcond = 0;
+						} else
+						{
+							tmp = insertNext(tmp, stmt, unifont, NULL, NULL, NULL, NULL);
+						}
+						list = setOffset(list, x, y);
+						btnEnable = 0;
 					}
-					list = setOffset(list, x, y);
-					btnEnable = 0;
 				}
 			}
-		}
-		
-		/**********************************
-		* dragging code below, do not touch
-		**********************************/
-		
-		/* if one of the instructions is dragged */
-		for(tmp = list; tmp != NULL; tmp = tmp->next)
-		{
-			struct inst_gr *tmpInst;
-			for(tmpInst = tmp->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
+			
+			/**********************************
+			* dragging code below, do not touch
+			**********************************/
+			
+			/* if one of the instructions is dragged */
+			for(tmp = list; tmp != NULL; tmp = tmp->next)
 			{
-				if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && collideInstPressed(msPos, tmpInst) && tmp->draw.stmts != whiletail_st && tmp->draw.stmts != iftail_st && movEnable == 0)
+				struct inst_gr *tmpInst;
+				for(tmpInst = tmp->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
 				{
-					tmp = setGreen(tmp);
-					save = tmp;
-					if(tmp->draw.stmts == whilehead_st || tmp->draw.stmts == ifhead_st)
+					if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && collideInstPressed(msPos, tmpInst) && tmp->draw.stmts != whiletail_st && tmp->draw.stmts != iftail_st && movEnable == 0)
 					{
-						int tempLength = 1;
-						
-						struct list *l;
-						int n = 1;
-						for(l = tmp->next; n > 0; l = l->next)
+						tmp = setGreen(tmp);
+						save = tmp;
+						if(tmp->draw.stmts == whilehead_st || tmp->draw.stmts == ifhead_st)
 						{
-							if(l->draw.stmts == whilehead_st || l->draw.stmts == ifhead_st) n++;
-							if(l->draw.stmts == whiletail_st || l->draw.stmts == iftail_st) n--;
+							int tempLength = 1;
 							
-							tempLength++;
+							struct list *l;
+							int n = 1;
+							for(l = tmp->next; n > 0; l = l->next)
+							{
+								if(l->draw.stmts == whilehead_st || l->draw.stmts == ifhead_st) n++;
+								if(l->draw.stmts == whiletail_st || l->draw.stmts == iftail_st) n--;
+								
+								tempLength++;
+							}
+							
+							blockLength = tempLength;
 						}
 						
-						blockLength = tempLength;
-					}
+						if(tmp->draw.stmts == whilehead_st || tmp->draw.stmts == ifhead_st)
+						{	
+							tmp = setGreen(tmp);
 					
-					if(tmp->draw.stmts == whilehead_st || tmp->draw.stmts == ifhead_st)
-					{	
-						tmp = setGreen(tmp);
-				
-						struct list *color;
-						int n = 1;
-						for(color = tmp->next; n > 0; color = color->next)
+							struct list *color;
+							int n = 1;
+							for(color = tmp->next; n > 0; color = color->next)
+							{
+								if(color->draw.stmts == whilehead_st || color->draw.stmts == ifhead_st) n++;
+								if(color->draw.stmts == whiletail_st || color->draw.stmts == iftail_st) n--;
+							
+								color = setGreen(color);
+							}
+						} else
 						{
-							if(color->draw.stmts == whilehead_st || color->draw.stmts == ifhead_st) n++;
-							if(color->draw.stmts == whiletail_st || color->draw.stmts == iftail_st) n--;
-						
-							color = setGreen(color);
+							tmp = setGreen(tmp);
 						}
-					} else
+						movEnable = 1;
+					} else if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && collideInstRelease(msPos, tmpInst) && movEnable == 1)
 					{
-						tmp = setGreen(tmp);
-					}
-					movEnable = 1;
-				} else if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && collideInstRelease(msPos, tmpInst) && movEnable == 1)
-				{
-					int unable = 0;
-					if(save->draw.stmts == whilehead_st || save->draw.stmts == ifhead_st)
-					{
-						struct list *test;
-						int i = 0;
-						for(test = save; i<blockLength; i++)
-						{
-							if(test == tmp) unable = 1;
-							test = test->next;
-						}
-					}
-					
-					if(tmp->next != save && tmp->next != save->next && unable == 0)
-					{
+						int unable = 0;
 						if(save->draw.stmts == whilehead_st || save->draw.stmts == ifhead_st)
 						{
-							struct list *insert;
-							for(insert = list; insert->next != save; insert = insert->next);
-							
-							int i;
-							for(i = 0; i < blockLength; i++)
+							struct list *test;
+							int i = 0;
+							for(test = save; i<blockLength; i++)
 							{
+								if(test == tmp) unable = 1;
+								test = test->next;
+							}
+						}
+						
+						if(tmp->next != save && tmp->next != save->next && unable == 0)
+						{
+							if(save->draw.stmts == whilehead_st || save->draw.stmts == ifhead_st)
+							{
+								struct list *insert;
+								for(insert = list; insert->next != save; insert = insert->next);
+								
+								int i;
+								for(i = 0; i < blockLength; i++)
+								{
+									optVar[0] = NULL;
+									optVar[1] = NULL;
+									optCond = NULL;
+									optDir = NULL;
+									
+									int varNum = 0;
+									struct inst_gr *tmpInst;
+									for(tmpInst = insert->next->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
+									{
+										if(tmpInst->type == var_gr)
+										{
+											optVar[varNum] = tmpInst->text;
+											varNum++;
+										}
+										
+										if(tmpInst->type == cond_gr) optCond = tmpInst->text;
+										if(tmpInst->type == dir_gr) optDir = tmpInst->text;
+									}
+									
+									tmp = insertNext(tmp, insert->next->draw.stmts, unifont, optVar[0], optVar[1], optCond, optDir);
+									tmp = tmp->next;
+									insert = insert->next;
+								}
+							} else
+							{
+								struct list *del;
+								for(del = list; del->next != save; del = del->next);
+								del = deleteNext(del);
+								
 								optVar[0] = NULL;
 								optVar[1] = NULL;
 								optCond = NULL;
@@ -1038,7 +1082,7 @@ int main(void)
 								
 								int varNum = 0;
 								struct inst_gr *tmpInst;
-								for(tmpInst = insert->next->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
+								for(tmpInst = save->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
 								{
 									if(tmpInst->type == var_gr)
 									{
@@ -1050,9 +1094,47 @@ int main(void)
 									if(tmpInst->type == dir_gr) optDir = tmpInst->text;
 								}
 								
-								tmp = insertNext(tmp, insert->next->draw.stmts, unifont, optVar[0], optVar[1], optCond, optDir);
-								tmp = tmp->next;
-								insert = insert->next;
+								tmp = insertNext(tmp, save->draw.stmts, unifont, optVar[0], optVar[1], optCond, optDir);
+							}
+							
+							struct list *color;
+							for(color = list; color->next != NULL; )
+							{
+								if(color->next->draw.inst->clr.r == 0   &&
+								   color->next->draw.inst->clr.g == 228 &&
+								   color->next->draw.inst->clr.b == 48  &&
+								   color->next->draw.inst->clr.a == 255)
+								{
+									color = deleteNext(color);
+								} else
+								{
+									color = color->next;
+								}
+							}
+						}
+						
+						tmp = setBack(tmp);
+						
+						movEnable = 0;
+						
+						list = setOffset(list, x, y);
+					}
+					
+					if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, trash) && movEnable == 1)
+					{
+						if(save->draw.stmts == whilehead_st || save->draw.stmts == ifhead_st)
+						{
+							struct list *del;
+							for(del = list; del->next != save; del = del->next);
+							
+							int i;
+							for(i = 0; i<blockLength; i++)
+							{
+								del = deleteNext(del);
+								optVar[0] = NULL;
+								optVar[1] = NULL;
+								optCond = NULL;
+								optDir = NULL;
 							}
 						} else
 						{
@@ -1064,197 +1146,237 @@ int main(void)
 							optVar[1] = NULL;
 							optCond = NULL;
 							optDir = NULL;
-							
-							int varNum = 0;
-							struct inst_gr *tmpInst;
-							for(tmpInst = save->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
-							{
-								if(tmpInst->type == var_gr)
-								{
-									optVar[varNum] = tmpInst->text;
-									varNum++;
-								}
-								
-								if(tmpInst->type == cond_gr) optCond = tmpInst->text;
-								if(tmpInst->type == dir_gr) optDir = tmpInst->text;
-							}
-							
-							tmp = insertNext(tmp, save->draw.stmts, unifont, optVar[0], optVar[1], optCond, optDir);
 						}
 						
-						struct list *color;
-						for(color = list; color->next != NULL; )
-						{
-							if(color->next->draw.inst->clr.r == 0   &&
-							   color->next->draw.inst->clr.g == 228 &&
-							   color->next->draw.inst->clr.b == 48  &&
-							   color->next->draw.inst->clr.a == 255)
-							{
-								color = deleteNext(color);
-							} else
-							{
-								color = color->next;
-							}
-						}
+						movEnable = 0;
+						
+						list = setOffset(list, x, y);
+					}
+				}
+			}
+			
+			/* don't touch above code */
+			
+			/* dragging variables, conditionals, and directions */
+			for(tmp = list; tmp != NULL; tmp = tmp->next)
+			{
+				struct inst_gr *tmpInst;
+				for(tmpInst = tmp->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
+				{
+					if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmpInst->rec) && tmpInst->type == var_gr && varEnable == 1)
+					{
+						char *tempStr = calloc(strlen(variables[saveVar].str)+3, 1);
+						strcat(tempStr, " ");
+						strcat(tempStr, variables[saveVar].str);
+						strcat(tempStr, " ");
+						
+						tmpInst = changeInst(tmpInst, tempStr, unifont);
+						tmpInst = setOffsetX(tmpInst, tmpInst->rec.x, tmpInst->rec.y);
 					}
 					
-					tmp = setBack(tmp);
+					if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmpInst->rec) && tmpInst->type == cond_gr && condEnable == 1)
+					{
+						char *tempStr = calloc(strlen(conditionals[saveCond].str)+3, 1);
+						strcat(tempStr, " ");
+						strcat(tempStr, conditionals[saveCond].str);
+						strcat(tempStr, " ");
+						
+						tmpInst = changeInst(tmpInst, tempStr, unifont);
+						tmpInst = setOffsetX(tmpInst, tmpInst->rec.x, tmpInst->rec.y);
+					}
 					
-					movEnable = 0;
+					if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmpInst->rec) && tmpInst->type == dir_gr && dirEnable == 1)
+					{
+						char *tempStr = calloc(strlen(directions[saveDir].str)+3, 1);
+						strcat(tempStr, " ");
+						strcat(tempStr, directions[saveDir].str);
+						strcat(tempStr, " ");
+						
+						tmpInst = changeInst(tmpInst, tempStr, unifont);
+						tmpInst = setOffsetX(tmpInst, tmpInst->rec.x, tmpInst->rec.y);
+					}
 					
-					list = setOffset(list, x, y);
+					if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmpInst->rec) && tmpInst->type == var_gr && numEnable == 1)
+					{
+						char *tempStr = calloc(strlen(numStr)+3, 1);
+						strcat(tempStr, " ");
+						strcat(tempStr, numStr);
+						strcat(tempStr, " ");
+						
+						tmpInst = changeInst(tmpInst, tempStr, unifont);
+						tmpInst = setOffsetX(tmpInst, tmpInst->rec.x, tmpInst->rec.y);
+					}
 				}
 			}
-		}
-		
-		/* don't touch above code */
-		
-		/* dragging variables, conditionals, and directions */
-		for(tmp = list; tmp != NULL; tmp = tmp->next)
-		{
-			struct inst_gr *tmpInst;
-			for(tmpInst = tmp->draw.inst; tmpInst != NULL; tmpInst = tmpInst->next)
+			
+			if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
 			{
-				if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmpInst->rec) && tmpInst->type == var_gr && varEnable == 1)
-				{
-					char *tempStr = calloc(strlen(variables[saveVar].str)+3, 1);
-					strcat(tempStr, " ");
-					strcat(tempStr, variables[saveVar].str);
-					strcat(tempStr, " ");
-					
-					tmpInst = changeInst(tmpInst, tempStr, unifont);
-					tmpInst = setOffsetX(tmpInst, tmpInst->rec.x, tmpInst->rec.y);
-				}
-				
-				if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmpInst->rec) && tmpInst->type == cond_gr && condEnable == 1)
-				{
-					char *tempStr = calloc(strlen(conditionals[saveCond].str)+3, 1);
-					strcat(tempStr, " ");
-					strcat(tempStr, conditionals[saveCond].str);
-					strcat(tempStr, " ");
-					
-					tmpInst = changeInst(tmpInst, tempStr, unifont);
-					tmpInst = setOffsetX(tmpInst, tmpInst->rec.x, tmpInst->rec.y);
-				}
-				
-				if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmpInst->rec) && tmpInst->type == dir_gr && dirEnable == 1)
-				{
-					char *tempStr = calloc(strlen(directions[saveDir].str)+3, 1);
-					strcat(tempStr, " ");
-					strcat(tempStr, directions[saveDir].str);
-					strcat(tempStr, " ");
-					
-					tmpInst = changeInst(tmpInst, tempStr, unifont);
-					tmpInst = setOffsetX(tmpInst, tmpInst->rec.x, tmpInst->rec.y);
-				}
-				
-				if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, tmpInst->rec) && tmpInst->type == var_gr && numEnable == 1)
-				{
-					char *tempStr = calloc(strlen(numStr)+3, 1);
-					strcat(tempStr, " ");
-					strcat(tempStr, numStr);
-					strcat(tempStr, " ");
-					
-					tmpInst = changeInst(tmpInst, tempStr, unifont);
-					tmpInst = setOffsetX(tmpInst, tmpInst->rec.x, tmpInst->rec.y);
-				}
+				btnEnable = 0;
+				movEnable = 0;
+				varEnable = 0;
+				condEnable = 0;
+				dirEnable = 0;
+				numEnable = 0;
 			}
-		}
-		
-		if(IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
-		{
-			btnEnable = 0;
-			movEnable = 0;
-			varEnable = 0;
-			condEnable = 0;
-			dirEnable = 0;
-			numEnable = 0;
-		}
-		
-		if(movEnable == 1)
-		{
-			hover(msPos, part);
-		} else
-		{
-			struct list *color;
-			for(color = list->next; color != NULL; color = color->next) color = setBack(color);
-		}
-		
-		/* instruction stuff above */
-		
-		Rectangle startBtnRec = {500, 275, 100, 25};
-		DrawRectangleRec(startBtnRec, startBtnClr);
-		
-		if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, startBtnRec) && ColorIsEqual(startBtnClr, GREEN))
-		{
-			startBtnClr = RED;
 			
-			code = NULL;
-			code = transcribe(list);
-			
-			tk = getNextToken(&code); /* get first token */
-    
-			/* symbol table stack init */
-			st.tb = NULL;
-			st.top = -1;
-			
-			/* table of saved pointers for deallocation after
-			   values are popped off the stack */
-			saveTb = NULL;
-			saveTableSize = 0;
-			
-			instList = NULL;
-			instListSize = 0;
-			
-			int label = 0;
-			
-			int halt = 0;
-			
-			int fail = parse(&code, &tk, &st, &saveTb, &saveTableSize, &instList, &instListSize, &label, &halt);
-		
-			if(fail)
+			if(movEnable == 1)
 			{
-				interp = 0;
+				hover(msPos, part);
 			} else
 			{
-				interp = 1;
+				struct list *color;
+				for(color = list->next; color != NULL; color = color->next) color = setBack(color);
 			}
-		} else if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, startBtnRec) && ColorIsEqual(startBtnClr, RED))
-		{
-			startBtnClr = GREEN;
-			interp = 0;
 			
-			int i;
-			for(i = 0; i<emitSize; i++) printf("(%f, %f)\n", emit[i].x, emit[i].y);
+			/* instruction stuff above */
 			
-			emit = NULL;
-			emitSize = 0;
-			Vector2 initPos = {250, 250};
-			emit = emitLine(emit, initPos, &emitSize);
+			Rectangle startBtnRec = {550, 285, 100, 25};
+			DrawRectangleRec(startBtnRec, startBtnClr);
 			
-			rotation = -45.0;
-		}
-		
-		if(interp == 1)
-		{
-			int done = interpret(instList, instListSize, &currentInst, &emit, &emitSize, &rotation);
+			Rectangle canvas = {500, 50, 200, 200};
+			DrawRectangleLinesEx(canvas, 5.0, BLACK);
 			
-			if(done)
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, startBtnRec) && ColorIsEqual(startBtnClr, GREEN))
 			{
-				currentInst = 0;
+				startBtnClr = RED;
+				
+				code = NULL;
+				code = transcribe(list);
+				
+				tk = getNextToken(&code); /* get first token */
+				
+				instList = NULL;
+				instListSize = 0;
+				
+				int label = 0;
+				
+				int halt = 0;
+				
+				int fail = parse(&code, &tk, &st, &saveTb, &saveTableSize, &instList, &instListSize, &label, &halt);
+			
+				if(fail)
+				{
+					interp = 0;
+				} else
+				{
+					interp = 1;
+				}
+			} else if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, startBtnRec) && ColorIsEqual(startBtnClr, RED))
+			{
+				startBtnClr = GREEN;
 				interp = 0;
+				
+				emit = NULL;
+				emitSize = 0;
+				Vector2 initPos = {600, 150};
+				emit = emitLine(emit, initPos, &emitSize);
+				
+				rotation = 0.0;
+				
+				instList = NULL;
+				instListSize = 0;
 			}
-		}
-		
-		if(emitSize > 1)
-		{
-			int i;
-			for(i = 0; i<emitSize-1; i++)
+			
+			if(interp == 1)
 			{
-				/*printf("-%f, %f-\n", emit[i].x, emit[i].y);
-				printf("-%f, %f-\n", emit[i+1].x, emit[i+1].y);*/
-				DrawLineV(emit[i], emit[i+1], GREEN);
+				int done = interpret(instList, instListSize, &currentInst, &emit, &emitSize, &rotation);
+				
+				if(done)
+				{
+					currentInst = 0;
+					interp = 0;
+				}
 			}
+			
+			int drawLines;
+			for(drawLines = 0; drawLines<emitSize-1; drawLines++)
+			{
+				DrawLineV(emit[drawLines], emit[drawLines+1], GREEN);
+			}
+		} else if(state == 1)
+		{
+			Vector2 msPos = GetMousePosition();
+			
+			/* code button */
+			Vector2 codeBtnSize = MeasureTextEx(unifont, "code", 16, 1);
+			int codeWidth = codeBtnSize.x+5;
+			int codeHeight = codeBtnSize.y+5;
+			
+			Rectangle codeBtn = {50, 10, codeWidth+100, codeHeight};
+			DrawRectangleRounded(codeBtn, 100, 1000, BLACK);
+			
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, codeBtn)) state = 0;
+			
+			Vector2 codeStrPos = {codeBtn.x+52, codeBtn.y+2};
+			DrawTextEx(unifont, "code", codeStrPos, 16, 1, WHITE);
+			
+			/* docs button */
+			Vector2 docsBtnSize = MeasureTextEx(unifont, "docs", 16, 1);
+			int docsWidth = docsBtnSize.x+5;
+			int docsHeight = docsBtnSize.y+5;
+			
+			Rectangle docsBtn = {250, 10, docsWidth+100, docsHeight};
+			DrawRectangleRounded(docsBtn, 100, 1000, RED);
+			
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, docsBtn)) state = 1;
+			
+			Vector2 docsStrPos = {docsBtn.x+52, docsBtn.y+2};
+			DrawTextEx(unifont, "docs", docsStrPos, 16, 1, WHITE);
+			
+			/* about button */
+			Vector2 abtBtnSize = MeasureTextEx(unifont, "about", 16, 1);
+			int abtWidth = abtBtnSize.x+5;
+			int abtHeight = abtBtnSize.y+5;
+			
+			Rectangle abtBtn = {450, 10, abtWidth+100, abtHeight};
+			DrawRectangleRounded(abtBtn, 100, 1000, BLACK);
+			
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, abtBtn)) state = 2;
+			
+			Vector2 abtStrPos = {abtBtn.x+52, abtBtn.y+2};
+			DrawTextEx(unifont, "about", abtStrPos, 16, 1, WHITE);
+		} else if(state == 2)
+		{
+			Vector2 msPos = GetMousePosition();
+			
+			/* code button */
+			Vector2 codeBtnSize = MeasureTextEx(unifont, "code", 16, 1);
+			int codeWidth = codeBtnSize.x+5;
+			int codeHeight = codeBtnSize.y+5;
+			
+			Rectangle codeBtn = {50, 10, codeWidth+100, codeHeight};
+			DrawRectangleRounded(codeBtn, 100, 1000, BLACK);
+			
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, codeBtn)) state = 0;
+			
+			Vector2 codeStrPos = {codeBtn.x+52, codeBtn.y+2};
+			DrawTextEx(unifont, "code", codeStrPos, 16, 1, WHITE);
+			
+			/* docs button */
+			Vector2 docsBtnSize = MeasureTextEx(unifont, "docs", 16, 1);
+			int docsWidth = docsBtnSize.x+5;
+			int docsHeight = docsBtnSize.y+5;
+			
+			Rectangle docsBtn = {250, 10, docsWidth+100, docsHeight};
+			DrawRectangleRounded(docsBtn, 100, 1000, BLACK);
+			
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, docsBtn)) state = 1;
+			
+			Vector2 docsStrPos = {docsBtn.x+52, docsBtn.y+2};
+			DrawTextEx(unifont, "docs", docsStrPos, 16, 1, WHITE);
+			
+			/* about button */
+			Vector2 abtBtnSize = MeasureTextEx(unifont, "about", 16, 1);
+			int abtWidth = abtBtnSize.x+5;
+			int abtHeight = abtBtnSize.y+5;
+			
+			Rectangle abtBtn = {450, 10, abtWidth+100, abtHeight};
+			DrawRectangleRounded(abtBtn, 100, 1000, RED);
+			
+			if(IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && CheckCollisionPointRec(msPos, abtBtn)) state = 2;
+			
+			Vector2 abtStrPos = {abtBtn.x+52, abtBtn.y+2};
+			DrawTextEx(unifont, "about", abtStrPos, 16, 1, WHITE);
 		}
 		
 		ClearBackground(RAYWHITE);

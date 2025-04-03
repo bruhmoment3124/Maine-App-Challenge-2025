@@ -626,12 +626,21 @@ void let(char **str, struct token *tk, struct stack *st, struct table ***saveTb,
 		
 		if(tk->name == id)
 		{
-			struct entry *tempEntry = search(*st, tk->val, halt);
-			st->tb[st->top] = createEntry(st->tb[st->top], temp, tempEntry->val, halt);
+			struct entry *tempEntry2 = search(*st, tk->val, halt);
+			st->tb[st->top] = createEntry(st->tb[st->top], temp, tempEntry2->val, halt);
+			struct entry *tempEntry1 = search(*st, temp, halt);
+			*instList = emitInst(*instList, instListSize, op_set, &(tempEntry1->val), &(tempEntry2->val), NULL, halt);
 			expectName(str, tk, tk->name, halt);
 		} else if(tk->name == num)
 		{
-			st->tb[st->top] = createEntry(st->tb[st->top], temp, atoi(tk->val), halt); /* !!! ADD: definitely check size before hand so there is no overflow !!! */
+			int *c = malloc(sizeof(int)); /* constant value temporary */
+			*c = atoi(tk->val);
+			st->tb[st->top] = createEntry(st->tb[st->top], temp, *c, halt); /* !!! ADD: definitely check size before hand so there is no overflow !!! */
+			
+			struct entry *tempEntry1 = search(*st, temp, halt);
+			
+			*instList = emitInst(*instList, instListSize, op_set, &(tempEntry1->val), c, NULL, halt);
+			
 			expectName(str, tk, tk->name, halt);
 		} else
 		{
@@ -829,7 +838,9 @@ int interpret(struct inst *instList, int instListSize, int *currentInst, Vector2
             break;
             
             case op_subtract:
-                *(instList[i].arg2) -= *(instList[i].arg1);
+                //*(instList[i].arg2) -= *(instList[i].arg1);
+				
+				printf("%d\n", *(instList[i].arg1));
             break;
             
             case op_mult:
@@ -841,25 +852,15 @@ int interpret(struct inst *instList, int instListSize, int *currentInst, Vector2
 			break;
             
             case op_move:
-				//float x = cos(*rotation*PI/180) * *(instList[i].arg1);
-				//float y = sin(*rotation*PI/180) * *(instList[i].arg1);
+				float x = cos(*rotation*PI/180) * *(instList[i].arg1);
+				float y = sin(*rotation*PI/180) * *(instList[i].arg1);
 			
-				float x1 = 10;
-				float y1 = 0;
-			
-				Vector2 pos = {x1 + emit[*emitSize-1]->x, y1 + emit[*emitSize-1]->y};
+				Vector2 pos = {x + (*emit)[*emitSize-1].x, y + (*emit)[*emitSize-1].y};
 				*emit = emitLine(*emit, pos, emitSize);
-				
-				float x2 = 0;
-				float y2 = 10;
-			
-				Vector2 pos2 = {x2 + emit[*emitSize-1]->x, y2 + emit[*emitSize-1]->y};
-				*emit = emitLine(*emit, pos2, emitSize);
             break;
 			
 			case op_turn:
-				//if(*(instList[i].arg2) == -1) *rotation += *(instList[i].arg1);
-				//if(*(instList[i].arg2) == -1) *rotation += *(instList[i].arg1) * *(instList[i].arg2);
+				*rotation += *(instList[i].arg1) * *(instList[i].arg2);
 			break;
             
             case op_jle:
