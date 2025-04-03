@@ -541,11 +541,14 @@ void turn(char **str, struct token *tk, struct stack *st, struct table ***saveTb
 		expectVal(str, tk, "turn", halt);
 		expectVal(str, tk, "turtle", halt);
 		
+		int *dir = malloc(sizeof(int));
 		if(strcmp(tk->val, "left") == 0)
 		{
+			*dir = -1;
 			expectVal(str, tk, tk->val, halt);
 		} else if(strcmp(tk->val, "right") == 0)
 		{
+			*dir = 1;
 			expectVal(str, tk, tk->val, halt);
 		} else
 		{
@@ -557,9 +560,13 @@ void turn(char **str, struct token *tk, struct stack *st, struct table ***saveTb
 		if(tk->name == id)
 		{
 			struct entry *arg = search(*st, tk->val, halt);
+			*instList = emitInst(*instList, instListSize, op_turn, &(arg->val), dir, NULL, halt);
 			expectName(str, tk, tk->name, halt);
 		} else if(tk->name == num)
 		{
+			int *c = malloc(sizeof(int)); /* constant value temporary */
+			*c = atoi(tk->val);
+			*instList = emitInst(*instList, instListSize, op_turn, c, dir, NULL, halt);
 			expectName(str, tk, tk->name, halt);
 		} else
 		{
@@ -801,7 +808,16 @@ int parse(char **str, struct token *tk, struct stack *st, struct table ***saveTb
 	return 0;
 }
 
-int interpret(struct inst *instList, int instListSize, int *currentInst)
+Vector2 * emitLine(Vector2 *emit, Vector2 pnt, int *emitSize)
+{
+	emit = realloc(emit, (*emitSize+1) * sizeof(Vector2));
+	emit[*emitSize] = pnt;
+	(*emitSize)++;
+	
+	return emit;
+}
+
+int interpret(struct inst *instList, int instListSize, int *currentInst, Vector2 **emit, int *emitSize, float *rotation)
 {
 	int i = *currentInst;
     if(i < instListSize)
@@ -825,8 +841,26 @@ int interpret(struct inst *instList, int instListSize, int *currentInst)
 			break;
             
             case op_move:
-                printf("%d\n", *(instList[i].arg1));
+				//float x = cos(*rotation*PI/180) * *(instList[i].arg1);
+				//float y = sin(*rotation*PI/180) * *(instList[i].arg1);
+			
+				float x1 = 10;
+				float y1 = 0;
+			
+				Vector2 pos = {x1 + emit[*emitSize-1]->x, y1 + emit[*emitSize-1]->y};
+				*emit = emitLine(*emit, pos, emitSize);
+				
+				float x2 = 0;
+				float y2 = 10;
+			
+				Vector2 pos2 = {x2 + emit[*emitSize-1]->x, y2 + emit[*emitSize-1]->y};
+				*emit = emitLine(*emit, pos2, emitSize);
             break;
+			
+			case op_turn:
+				//if(*(instList[i].arg2) == -1) *rotation += *(instList[i].arg1);
+				//if(*(instList[i].arg2) == -1) *rotation += *(instList[i].arg1) * *(instList[i].arg2);
+			break;
             
             case op_jle:
                 if(*(instList[i].arg1) <= *(instList[i].arg2))

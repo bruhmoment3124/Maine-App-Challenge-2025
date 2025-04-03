@@ -333,8 +333,14 @@ struct list * deleteNext(struct list *list)
 
 void drawVals(struct list *list, Font fnt)
 {
+	int i = 0;
+	
 	struct list *tmp;
-	for(tmp = list->next; tmp != NULL; tmp = tmp->next) drawInst(tmp->draw.inst, fnt);
+	for(tmp = list->next; (tmp != NULL) && (i < 13); tmp = tmp->next)
+	{
+		i++;
+		drawInst(tmp->draw.inst, fnt);
+	}
 }
 
 struct btns
@@ -555,9 +561,11 @@ int drawUnderline(Vector2 msPos, struct inst_gr *inst)
 
 void hover(Vector2 msPos, struct list *list)
 {
+	int drawn = 0;
+	
 	/* draw green line below instructions */
 	struct list *tmp;
-	for(tmp = list->next; tmp != NULL; tmp = tmp->next)
+	for(tmp = list->next; (tmp != NULL) && (drawn < 12); tmp = tmp->next)
 	{
 		if(drawUnderline(msPos, tmp->draw.inst))
 		{
@@ -567,6 +575,7 @@ void hover(Vector2 msPos, struct list *list)
 				DrawRectangle(i->rec.x, i->rec.y+18, i->rec.width, 2, GREEN);
 			}
 		}
+		drawn++;
 	}
 	
 	/* draw red line when above start */
@@ -673,6 +682,12 @@ int main(void)
 	
 	struct list *part = list;
 	
+	int emitSize = 0;
+	Vector2 initPos = {250, 250};
+	Vector2 *emit = NULL;
+	emit = emitLine(emit, initPos, &emitSize);
+	float rotation = -45.0;
+	
 	/* interpreter setup */
 	char *code;
 	
@@ -700,7 +715,7 @@ int main(void)
 		DrawRectangleLines(50, 350, 400, 225, BLACK);
 		
 		/* draw code box */
-		DrawRectangle(50, 50, 400, 250, GRAY);
+		DrawRectangle(50, 50, 400, 260, GRAY);
 		
 		/* draw state buttons */
 		
@@ -736,31 +751,22 @@ int main(void)
 		
 		Vector2 abtStrPos = {abtBtn.x+52, abtBtn.y+2};
 		DrawTextEx(unifont, "about", abtStrPos, 16, 1, WHITE);
-		
-		/* test */
-		/*if(IsKeyDown(KEY_UP)) y--;
-		if(IsKeyDown(KEY_DOWN)) y++;
-		if(IsKeyDown(KEY_LEFT)) x--;
-		if(IsKeyDown(KEY_RIGHT)) x++;
-		
-		if(IsKeyDown(KEY_UP)   ||
-		   IsKeyDown(KEY_DOWN) ||
-		   IsKeyDown(KEY_LEFT) ||
-		   IsKeyDown(KEY_RIGHT)) list = setOffset(list, x, y);*/
 		   
-		if(IsKeyPressed(KEY_UP) && part != list)
+		if(IsKeyPressed(KEY_UP) && part->next->next != NULL)
 		{
-			struct list *tmp;
-			for(tmp = list; tmp->next != part; tmp = tmp->next);
-			
-			part = tmp;
-			part = setOffset(part, x, y);
+			y -= 20;
+			list = setOffset(list, x, y);
+			part = part->next;
 		}   
 		
-		if(IsKeyPressed(KEY_DOWN) && part->next->next != NULL)
+		if(IsKeyPressed(KEY_DOWN) && part != list)
 		{
-			part = part->next;
-			if(part->draw.stmts != whilehead_st || part->draw.stmts != ifhead_st) part = setOffset(part, x, y);
+			y += 20;
+			list = setOffset(list, x, y);
+			
+			struct list *tmp;
+			for(tmp = list; tmp->next != part; tmp = tmp->next);
+			part = tmp;
 		}
 		
 		/* draw buttons */
@@ -829,11 +835,10 @@ int main(void)
 			}
 		}
 		
-		
 		/* if a button has been pressed, enable it */
 		if(btnEnable == 1)
 		{
-			hover(msPos, list);
+			hover(msPos, part);
 		
 			Vector2 tmpSize = MeasureTextEx(unifont, buttons[saveInst].str, 16, 1);
 			int width = tmpSize.x+5;
@@ -1168,7 +1173,7 @@ int main(void)
 		
 		if(movEnable == 1)
 		{
-			hover(msPos, list);
+			hover(msPos, part);
 		} else
 		{
 			struct list *color;
@@ -1218,16 +1223,37 @@ int main(void)
 		{
 			startBtnClr = GREEN;
 			interp = 0;
+			
+			int i;
+			for(i = 0; i<emitSize; i++) printf("(%f, %f)\n", emit[i].x, emit[i].y);
+			
+			emit = NULL;
+			emitSize = 0;
+			Vector2 initPos = {250, 250};
+			emit = emitLine(emit, initPos, &emitSize);
+			
+			rotation = -45.0;
 		}
 		
 		if(interp == 1)
 		{
-			int done = interpret(instList, instListSize, &currentInst);
+			int done = interpret(instList, instListSize, &currentInst, &emit, &emitSize, &rotation);
 			
 			if(done)
 			{
 				currentInst = 0;
 				interp = 0;
+			}
+		}
+		
+		if(emitSize > 1)
+		{
+			int i;
+			for(i = 0; i<emitSize-1; i++)
+			{
+				/*printf("-%f, %f-\n", emit[i].x, emit[i].y);
+				printf("-%f, %f-\n", emit[i+1].x, emit[i+1].y);*/
+				DrawLineV(emit[i], emit[i+1], GREEN);
 			}
 		}
 		
