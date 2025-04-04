@@ -1247,6 +1247,7 @@ int main(void)
 				
 				instList = NULL;
 				instListSize = 0;
+				currentInst = 0;
 				
 				int label = 0;
 				
@@ -1275,6 +1276,7 @@ int main(void)
 				
 				instList = NULL;
 				instListSize = 0;
+				currentInst = 0;
 			}
 			
 			if(interp == 1)
